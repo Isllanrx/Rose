@@ -67,6 +67,8 @@ Ordenado por prioridade. Checklists detalhados: skills `prod-risk-review` e `win
 | 58 | Docstrings nas APIs publicas (1.222 funcoes, 126 classes; 726 com anotacao de retorno = 59%) | qualidade | Padrao 2026; risco nulo |
 | 59 | Gate de cobertura no CI | qualidade | Padrao 2026; o #36 preve medir, nao preve minimo |
 
+| 63 | **Tela de instalacao pisca e despeja informacao tecnica** ao usuario. Consolidar numa janela unica com progresso; detalhe so para o log | UX | Observado pelo usuario numa instalacao real em 2026-09-19. **Verificado**: `Rose.spec:423` ja usa `console=False`, e `admin_utils.py` e `pengu_loader.py:400` ja passam `CREATE_NO_WINDOW`; o `installer.iss` usa `runhidden`. Restam sem `creationflags`: `update_installer.py:192` (`cmd /c` do batch) e `:312` (updater standalone) — mas esses sao do caminho de **update**, nao do install limpo. Hipotese mais provavel para o caso observado: o texto de status do launcher durante o primeiro start (download de skins + 230 MB de `hashes.game.txt`). **Precisa de repro visual** antes de mexer. Complementa #16 e #47 |
+
 ## Nota sobre Pydantic (#35)
 
 Reavaliar antes de adotar: adiciona dependencia compilada a um bundle PyInstaller que ja
