@@ -188,8 +188,8 @@ Mergeado na `dev` (`924f122d`), cada item em branch própria, validado e com tes
 - `ci/quality-workflow` + `ci/pipeline-hardening`: CI completo (ADR-009, ADR-010). Nunca rodou no GitHub
   (nada foi enviado). **Pendente do usuário:** ruleset no GitHub com os checks obrigatórios (lista na ADR-010).
 - `fix/build-without-workarounds`: build sem wrapper nem PATH; `/restore` separado corrige `MSB3644` em
-  clone limpo (#20). Comando: `.venv\Scripts\python.exe scriptsuild_pyinstaller.py`
-  (instalador junto: `scriptsuild_all.py`, exige Inno Setup 6).
+  clone limpo (#20). Comando: `.venv\Scripts\python.exe scripts\build_pyinstaller.py`
+  (instalador junto: `scripts\build_all.py`, exige Inno Setup 6).
 
 Próximo: #70 (log só crítico no AppData); pedir dados do #66 e #68; #77 (dependências vulneráveis).
 Fora dos commits: `assets/icon.ico` (regravado pelo build do instalador). O Rose de diagnóstico
