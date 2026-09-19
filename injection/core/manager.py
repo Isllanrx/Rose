@@ -45,6 +45,8 @@ class InjectionManager:
         self._injection_in_progress = False  # Track if injection is running
         self._cleanup_in_progress = False  # Track if cleanup is running
         self._cleanup_lock = threading.Lock()  # Lock for cleanup operations
+        self._wad_index_lock = threading.Lock()  # One index build at a time
+        self._wad_index_ready = False
 
         # Initialize managers
         self.threshold_manager = ThresholdManager(shared_state)
@@ -419,7 +421,23 @@ class InjectionManager:
         The index is what lets mod compatibility be checked without scanning tens of
         gigabytes of WADs. Without it every caller falls back to the current path, so
         any failure here is a warning and nothing more.
+
+        initialize_when_ready() is called from three places and only guards on
+        _initialized, which stays False while League is closed. Without the flag and
+        the non-blocking lock below, every one of those calls would walk the game's
+        392 WADs again, during startup.
         """
+        if self._wad_index_ready:
+            return
+        if not self._wad_index_lock.acquire(blocking=False):
+            log.debug("[WADIDX] Index build already running, skipping")
+            return
+        try:
+            self._build_wad_index_once()
+        finally:
+            self._wad_index_lock.release()
+
+    def _build_wad_index_once(self) -> None:
         try:
             injector = getattr(self, "injector", None)
             game_dir = getattr(injector, "game_dir", None) or self.game_dir
@@ -429,11 +447,13 @@ class InjectionManager:
 
             started = time.monotonic()
             if ensure_index_built(Path(game_dir), default_index_path()):
+                self._wad_index_ready = True
                 log.info("[WADIDX] Game index ready in %.2fs", time.monotonic() - started)
             else:
                 log.warning("[WADIDX] Game index unavailable, compatibility checks will fall back")
-        except Exception as e:
-            log.warning("[WADIDX] Game index build failed: %s", e)
+        except Exception:
+            # Unexpected here, so the traceback is what makes it diagnosable.
+            log.exception("[WADIDX] Game index build failed")
 
     @property
     def last_injected_skin(self) -> Optional[str]:

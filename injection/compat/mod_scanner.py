@@ -110,6 +110,7 @@ def parse_prop_links(data: bytes) -> Optional[list[str]]:
         (version,) = struct.unpack_from("<I", data, offset)
         offset += 4
         if version < 2:
+            log.debug('[COMPAT] PROP version %d is too old to read links', version)
             return None
         (link_count,) = struct.unpack_from("<I", data, offset)
         offset += 4
@@ -193,6 +194,7 @@ def scan_mod(mod_dir: Path, index: WadIndex,
                 unreadable += 1
                 continue
             if not payload:
+                log.debug('[COMPAT] Entry %016x decoded to nothing', entry_hash)
                 continue
 
             targets = parse_prop_links(payload)
@@ -212,4 +214,8 @@ def scan_mod(mod_dir: Path, index: WadIndex,
                           dangling=tuple(dangling), skipped_entries=skipped,
                           unreadable_entries=unreadable, unreadable_wads=unreadable_wads)
     log.info("[COMPAT] %s: %s", mod_dir.name, report.summary())
+    if not report.complete:
+        # A clean result from a partial scan means "not checked", not "safe".
+        log.warning("[COMPAT] %s was only partially inspected; a clean result here "
+                    "does not prove the mod is compatible", mod_dir.name)
     return report
