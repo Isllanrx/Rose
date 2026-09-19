@@ -38,7 +38,7 @@ Opções, com a recomendação primeiro:
 ## Estado
 
 ```
-dev   ce265ee4   (53 commits à frente, 2026-09-19 fim do dia)
+dev   924f122d   (2026-09-19, fim da sessão)
 main  45b24701   intacta, igual a origin/main
 ```
 
@@ -178,3 +178,19 @@ Detalhes em `tasks/completed/2026-09-19-validacao-in-game-indice-wad.md`.
   0 sem justificativa (~90 com log, ~147 `silent-ok`). Guarda `test/test_no_silent_exceptions.py`
   (acusa 249 no código anterior). 199 unitários + 14 pesados OK, 59 módulos importam.
   Merge na `dev` autorizado pelo usuário. Pendentes: #70 (log só crítico no AppData), #72 (JS).
+
+---
+
+# Fechamento da sessão (2026-09-19, noite)
+
+Mergeado na `dev` (`924f122d`), cada item em branch própria, validado e com testes:
+- `fix/log-noise`: #22, #64, #25 (sem ERROR falso do WebSocket, sem flood de recusa).
+- `ci/quality-workflow` + `ci/pipeline-hardening`: CI completo (ADR-009, ADR-010). Nunca rodou no GitHub
+  (nada foi enviado). **Pendente do usuário:** ruleset no GitHub com os checks obrigatórios (lista na ADR-010).
+- `fix/build-without-workarounds`: build sem wrapper nem PATH; `/restore` separado corrige `MSB3644` em
+  clone limpo (#20). Comando: `.venv\Scripts\python.exe scriptsuild_pyinstaller.py`
+  (instalador junto: `scriptsuild_all.py`, exige Inno Setup 6).
+
+Próximo: #70 (log só crítico no AppData); pedir dados do #66 e #68; #77 (dependências vulneráveis).
+Fora dos commits: `assets/icon.ico` (regravado pelo build do instalador). O Rose de diagnóstico
+ainda roda do `dist` (build de diagnóstico, antes do CI): fechar antes do próximo build.
