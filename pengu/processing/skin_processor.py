@@ -161,12 +161,16 @@ class SkinProcessor:
             old_is_chroma = old_base_skin_id != int(old_skin_id)
             new_is_chroma = new_base_skin_id != int(skin_id)
             selected_chroma_is_current_skin = False
-            try:
-                selected_chroma_is_current_skin = (
-                    int(self.shared_state.selected_chroma_id) == int(skin_id)
-                )
-            except (TypeError, ValueError):
-                pass
+            raw_chroma_id = self.shared_state.selected_chroma_id
+            if raw_chroma_id is not None:
+                try:
+                    selected_chroma_is_current_skin = int(raw_chroma_id) == int(skin_id)
+                except (TypeError, ValueError):
+                    log.debug(
+                        "[CHROMA] Cannot compare selected_chroma_id %r with skin %r",
+                        raw_chroma_id,
+                        skin_id,
+                    )
 
             if (
                 (
@@ -212,9 +216,13 @@ class SkinProcessor:
         skin. That is useful for normal skin tracking, but it must not erase an
         explicit chroma selection immediately after the chroma wheel reports it.
         """
+        raw_chroma_id = self.shared_state.selected_chroma_id
+        if raw_chroma_id is None:
+            return None
         try:
-            selected_chroma_id = int(self.shared_state.selected_chroma_id)
+            selected_chroma_id = int(raw_chroma_id)
         except (TypeError, ValueError):
+            log.debug("[SkinMonitor] Ignoring invalid selected_chroma_id %r", raw_chroma_id)
             return None
 
         cache = getattr(self.skin_scraper, "cache", None)
@@ -241,20 +249,38 @@ class SkinProcessor:
         """
         champ_id = getattr(self.shared_state, "locked_champ_id", None)
         if not champ_id:
+            # The plugin only resends a title when it changes, so a title dropped here
+            # is lost unless the player moves the carousel again.
+            log.info(
+                "[SkinMonitor] Skin '%s' ignored: no locked champion yet (hovered=%s)",
+                skin_name,
+                getattr(self.shared_state, "hovered_champ_id", None),
+            )
             return None
-        
+
         if not self.skin_scraper:
             return None
-        
+
         try:
             if not self.skin_scraper.scrape_champion_skins(champ_id):
+                log.warning(
+                    "[SkinMonitor] Skin '%s' ignored: could not load skins for champion %s",
+                    skin_name,
+                    champ_id,
+                )
                 return None
         except Exception:
+            log.exception(
+                "[SkinMonitor] Skin '%s' ignored: loading skins for champion %s failed",
+                skin_name,
+                champ_id,
+            )
             return None
-        
+
         try:
             result = self.skin_scraper.find_skin_by_text(skin_name)
         except Exception:
+            log.exception("[SkinMonitor] Skin '%s' ignored: name matching failed", skin_name)
             return None
         
         if result:

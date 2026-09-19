@@ -159,7 +159,7 @@ class ZipResolver:
                     if found:
                         log_success(log, f"Found chroma: {found.name}", "")
                         return found
-            except ValueError:
+            except ValueError:  # silent-ok: entry is not a skin directory; skipped by design
                 # Not a skin directory, skip
                 continue
         

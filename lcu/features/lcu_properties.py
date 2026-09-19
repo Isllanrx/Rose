@@ -73,7 +73,7 @@ class LCUProperties:
                         try:
                             skin_ids.append(int(item_id))
                         except (ValueError, TypeError):
-                            pass
+                            log.debug(f"[LCU] Ignoring non-numeric owned skin id {item_id!r}")
             return skin_ids
         return None
     

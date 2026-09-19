@@ -104,9 +104,9 @@ class AppStatus:
                                     chroma_fantome = chroma_dir / f"{chroma_dir.name}.fantome"
                                     if chroma_zip.exists() or chroma_fantome.exists():
                                         return True
-                                except ValueError:
+                                except ValueError:  # silent-ok: entry is not a skin directory; skipped by design
                                     continue
-                    except ValueError:
+                    except ValueError:  # silent-ok: entry is not a skin directory; skipped by design
                         # Not a skin directory, skip
                         continue
             

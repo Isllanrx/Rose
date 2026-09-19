@@ -147,8 +147,8 @@ class RandomizationHandler:
                         self.state.ui_skin_thread._broadcast_historic_state()
                 except Exception as e:
                     log.debug(f"[UI] Failed to broadcast historic state on RandomMode activation: {e}")
-        except Exception:
-            pass
+        except Exception as exc:
+            log.debug(f"[UI] Failed to reset historic mode on RandomMode activation: {exc}")
 
         # Select random skin
         random_selection = self.select_random_skin()

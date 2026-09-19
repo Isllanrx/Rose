@@ -24,7 +24,7 @@ if is_windows():
     user32 = ctypes.windll.user32
     try: 
         user32.SetProcessDPIAware()
-    except Exception: 
+    except Exception:  # silent-ok: DPI awareness is optional
         pass
     
     EnumWindows = user32.EnumWindows
@@ -88,7 +88,7 @@ if is_windows():
                     ctypes.windll.user32.GetClientRect(hwnd, ctypes.byref(client_rect))
                     w = client_rect.right
                     h = client_rect.bottom
-                except Exception:
+                except Exception:  # silent-ok: polled continuously; a failure means no window this cycle
                     pass
                 if w >= 640 and h >= 480:
                     found_handle[0] = hwnd
@@ -97,7 +97,7 @@ if is_windows():
         
         try:
             EnumWindows(EnumWindowsProc(cb), 0)
-        except Exception:
+        except Exception:  # silent-ok: polled continuously; a failure means no window this cycle
             pass
         
         # Update cache
@@ -135,7 +135,7 @@ if is_windows():
             bottom = top + client_rect.bottom
             
             return (left, top, right, bottom)
-        except Exception:
+        except Exception:  # silent-ok: polled continuously; a failure means no window this cycle
             return None
     
     def find_league_window_rect(hint: str = "League") -> Optional[Tuple[int, int, int, int]]:
@@ -199,7 +199,7 @@ if is_windows():
                             'client_size': (w, h),
                             'hwnd': hwnd  # Store hwnd for focus checking
                         })
-                except Exception:
+                except Exception:  # silent-ok: falls back to the window rect
                     # Fallback to window rect if client rect fails
                     R = _win_rect(hwnd)
                     if R:
@@ -258,7 +258,7 @@ if is_windows():
             # Check if it's the League of Legends window
             return active_title == "league of legends"
             
-        except Exception:
+        except Exception:  # silent-ok: polled continuously; a failure means no window this cycle
             # If we can't determine focus, assume it's not focused for safety
             return False
     

@@ -25,11 +25,11 @@ def setup_console() -> None:
         # PROCESS_SYSTEM_DPI_AWARE
         try:
             ctypes.windll.shcore.SetProcessDpiAwareness(WINDOWS_DPI_AWARENESS_SYSTEM)
-        except (OSError, AttributeError) as e:
+        except (OSError, AttributeError) as e:  # silent-ok: console setup is optional and runs before logging is configured
             try:
                 # Fallback for older Windows versions
                 ctypes.windll.user32.SetProcessDPIAware()
-            except (OSError, AttributeError) as e2:
+            except (OSError, AttributeError) as e2:  # silent-ok: console setup is optional and runs before logging is configured
                 # If both fail, continue anyway - not critical
                 pass
         
@@ -63,10 +63,10 @@ def setup_console() -> None:
             # Set buffer size for both stdout and stderr
             ctypes.windll.kernel32.SetConsoleScreenBufferSize(stdout_handle, new_size)
             ctypes.windll.kernel32.SetConsoleScreenBufferSize(stderr_handle, new_size)
-        except (OSError, AttributeError):
+        except (OSError, AttributeError):  # silent-ok: console setup is optional and runs before logging is configured
             # Failed to increase buffer size - not critical, will rely on queue-based logging
             pass
-    except (OSError, AttributeError):
+    except (OSError, AttributeError):  # silent-ok: console setup is optional and runs before logging is configured
         # If console allocation fails, continue with original approach
         pass
 
@@ -105,7 +105,7 @@ def start_console_buffer_manager() -> None:
                 STD_OUTPUT_HANDLE = -11
                 stdout_handle = ctypes.windll.kernel32.GetStdHandle(STD_OUTPUT_HANDLE)
                 has_console_handle = stdout_handle and stdout_handle != -1
-            except (OSError, AttributeError):
+            except (OSError, AttributeError):  # silent-ok: console buffer upkeep is best-effort; logging here would feed the stream being flushed
                 has_console_handle = False
             
             while True:
@@ -115,20 +115,20 @@ def start_console_buffer_manager() -> None:
                 try:
                     while msvcrt.kbhit():
                         msvcrt.getch()
-                except (OSError, IOError):
+                except (OSError, IOError):  # silent-ok: console buffer upkeep is best-effort; logging here would feed the stream being flushed
                     pass
                 
                 # Flush output streams to prevent buffer blocking
                 try:
                     if sys.stdout and hasattr(sys.stdout, 'flush'):
                         sys.stdout.flush()
-                except (OSError, ValueError, IOError):
+                except (OSError, ValueError, IOError):  # silent-ok: console buffer upkeep is best-effort; logging here would feed the stream being flushed
                     pass  # Stream is closed or invalid
                 
                 try:
                     if sys.stderr and hasattr(sys.stderr, 'flush'):
                         sys.stderr.flush()
-                except (OSError, ValueError, IOError):
+                except (OSError, ValueError, IOError):  # silent-ok: console buffer upkeep is best-effort; logging here would feed the stream being flushed
                     pass  # Stream is closed or invalid
                 
                 # Try to read console buffer info to keep it from filling
@@ -148,10 +148,10 @@ def start_console_buffer_manager() -> None:
                         csbi = CONSOLE_SCREEN_BUFFER_INFO()
                         # Just reading the buffer info can help prevent some blocking scenarios
                         ctypes.windll.kernel32.GetConsoleScreenBufferInfo(stdout_handle, ctypes.byref(csbi))
-                    except (OSError, AttributeError):
+                    except (OSError, AttributeError):  # silent-ok: console buffer upkeep is best-effort; logging here would feed the stream being flushed
                         pass  # API call failed, not critical
                     
-        except (ImportError, OSError):
+        except (ImportError, OSError):  # silent-ok: console buffer upkeep is best-effort; logging here would feed the stream being flushed
             pass  # Thread will exit silently if it fails
     
     _console_thread = threading.Thread(target=_console_buffer_manager, daemon=True, name="ConsoleBufferManager")
@@ -166,7 +166,7 @@ def cleanup_console() -> None:
             if console_hwnd:
                 # Free the console
                 ctypes.windll.kernel32.FreeConsole()
-        except (OSError, AttributeError) as e:
+        except (OSError, AttributeError) as e:  # silent-ok: console setup is optional and runs before logging is configured
             # Logging might not be available at this point
             pass
 

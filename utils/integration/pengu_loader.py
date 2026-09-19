@@ -25,7 +25,7 @@ from typing import Iterable, Optional, Sequence
 
 try:
     import psutil  # type: ignore
-except ImportError:  # pragma: no cover - psutil is part of requirements, but guard just in case
+except ImportError:  # pragma: no cover - psutil is part of requirements, but guard just in case  # silent-ok: optional dependency; the feature degrades without it
     psutil = None  # type: ignore
 
 from utils.core.logging import get_logger
@@ -376,7 +376,7 @@ def _read_log_tail(
         if len(tail) > max_chars:
             tail = tail[-max_chars:]
         return tail or f'Pengu log is empty: {path}'
-    except Exception as exc:
+    except Exception as exc:  # silent-ok: error text is returned and logged by the caller
         return f'Pengu log could not be read: {path}: {exc}'
 
 
@@ -431,7 +431,7 @@ def _run_cli_result(args: Sequence[str], ok_codes: Iterable[int] = (0,)) -> Opti
         )
         try:
             pengu_log_tail = _read_log_tail(_PENGU_LOG)
-        except Exception as exc:
+        except Exception as exc:  # silent-ok: error text is included in the logged CLI result
             pengu_log_tail = f'Pengu log tail could not be read: {_PENGU_LOG}: {exc}'
         log.error(
             'Pengu Loader log tail from %s:\n%s',

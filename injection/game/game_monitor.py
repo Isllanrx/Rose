@@ -17,7 +17,7 @@ try:
     STATUS_STOPPED = psutil.STATUS_STOPPED
     NoSuchProcess = psutil.NoSuchProcess
     AccessDenied = psutil.AccessDenied
-except ImportError:
+except ImportError:  # silent-ok: optional dependency; PSUTIL_AVAILABLE gates every use
     PSUTIL_AVAILABLE = False
     psutil = None
     # Define fallback constants when psutil is not available
@@ -160,7 +160,7 @@ class GameMonitor:
                                         break
                                     except Exception as e:
                                         log.error(f"[monitor] Failed to suspend existing game: {e}")
-                                except (NoSuchProcess, AccessDenied):
+                                except (NoSuchProcess, AccessDenied):  # silent-ok: process ended or is protected while iterating; expected
                                     continue
                                 except Exception as e:
                                     log.debug(f"[monitor] Error checking existing process: {e}")
@@ -269,7 +269,7 @@ class GameMonitor:
                                         self._suspended_game_process = None
                                     break
                                 
-                            except NoSuchProcess:
+                            except NoSuchProcess:  # silent-ok: process ended or is protected while iterating; expected
                                 continue
                             except Exception as e:
                                 log.error(f"[monitor] Error: {e}")

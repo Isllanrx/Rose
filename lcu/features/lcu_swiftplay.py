@@ -154,8 +154,8 @@ class LCUSwiftplay:
                         derived_id = get_champion_id_from_skin_id(skin_id)
                         if derived_id:
                             champ_id = derived_id
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        log.debug(f"[Swiftplay] Could not derive champion from skin {skin_id!r}: {exc}")
 
                 if champ_id <= 0 and skin_id <= 0:
                     return None

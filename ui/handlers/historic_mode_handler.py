@@ -33,7 +33,7 @@ def historic_custom_mod_affects_skin(state: SharedState, *skin_ids: object) -> b
         for skin_id in skin_ids:
             try:
                 value = int(skin_id)
-            except (TypeError, ValueError):
+            except (TypeError, ValueError):  # silent-ok: invalid ids are skipped
                 continue
             if value > 0:
                 requested_ids.add(value)
@@ -57,14 +57,14 @@ def historic_custom_mod_affects_skin(state: SharedState, *skin_ids: object) -> b
         if len(path_parts) >= 2 and path_parts[0].casefold() == "skins":
             try:
                 storage_skin_id = int(path_parts[1])
-            except (TypeError, ValueError):
+            except (TypeError, ValueError):  # silent-ok: non-numeric folder means no storage skin id
                 storage_skin_id = None
 
         if storage is not None and storage_skin_id is not None:
             for entry in storage.list_mods_for_skin(storage_skin_id):
                 try:
                     relative_path = str(entry.path.relative_to(storage.mods_root))
-                except (ValueError, AttributeError):
+                except (ValueError, AttributeError):  # silent-ok: mods outside the mods root cannot match the saved path
                     continue
                 if relative_path.replace(chr(92), "/").casefold() != normalized_path:
                     continue
@@ -78,7 +78,8 @@ def historic_custom_mod_affects_skin(state: SharedState, *skin_ids: object) -> b
                     if not target_ids:
                         target_ids = {int(entry.skin_id)}
                     return bool(target_ids & requested_ids)
-                except (AttributeError, TypeError, ValueError):
+                except (AttributeError, TypeError, ValueError) as err:
+                    log.debug(f"[HISTORIC] Saved mod has unreadable target ids: {err}")
                     return False
 
         # Legacy fallback: at least recognize the storage skin encoded in the
@@ -87,7 +88,7 @@ def historic_custom_mod_affects_skin(state: SharedState, *skin_ids: object) -> b
         if len(path_parts) >= 2 and path_parts[0].casefold() == "skins":
             try:
                 return int(path_parts[1]) in requested_ids
-            except (TypeError, ValueError):
+            except (TypeError, ValueError):  # silent-ok: non-numeric folder cannot match; falls through to False
                 pass
     except Exception as exc:
         log.debug("[HISTORIC] Failed to resolve saved custom-mod targets: %s", exc)

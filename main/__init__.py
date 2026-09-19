@@ -56,7 +56,8 @@ def _check_dll_hash(dll_path) -> bool:
             for chunk in iter(lambda: f.read(65536), b""):
                 sha.update(chunk)
         return sha.hexdigest() in _VALID_DLL_HASHES
-    except Exception:
+    except Exception as exc:
+        log.warning(f"[DLL] Could not read {dll_path} to verify its hash: {exc}")
         return False
 
 
@@ -127,8 +128,8 @@ def _show_dll_dialog_legacy(tools_dir, reason="missing") -> bool:
         def on_open():
             try:
                 subprocess.run(["explorer", str(tools_dir)], check=False)
-            except Exception:
-                pass
+            except Exception as exc:
+                log.warning(f"[DLL] Could not open the tools folder: {exc}")
             root.destroy()
 
         def on_close():
@@ -137,8 +138,8 @@ def _show_dll_dialog_legacy(tools_dir, reason="missing") -> bool:
         def on_discord():
             try:
                 webbrowser.open("https://discord.gg/roseskins")
-            except Exception:
-                pass
+            except Exception as exc:
+                log.warning(f"[DLL] Could not open the Discord link: {exc}")
 
         btn_open = ttk.Button(btn_frame, text="📂 Open Folder", command=on_open)
         btn_open.pack(side=tk.LEFT, padx=(0, 10), ipadx=5, ipady=2)
@@ -159,13 +160,15 @@ def _show_dll_dialog_legacy(tools_dir, reason="missing") -> bool:
         root.mainloop()
         return False
         
-    except ImportError:
+    except ImportError:  # silent-ok: tkinter unavailable, falls back to a native MessageBox
         import ctypes
         msg = f"{header}\n\n{body}\n\nDiscord: https://discord.gg/roseskins\n\nClick OK to open the folder."
         res = ctypes.windll.user32.MessageBoxW(0, msg, title, 0x40031) # MB_OKCANCEL | MB_ICONWARNING | MB_SETFOREGROUND
         if res == 1: # IDOK
-            try: subprocess.run(["explorer", str(tools_dir)], check=False)
-            except Exception: pass
+            try:
+                subprocess.run(["explorer", str(tools_dir)], check=False)
+            except Exception as exc:
+                log.warning(f"[DLL] Could not open the tools folder: {exc}")
         return False
 
 
@@ -273,7 +276,7 @@ def _show_native_dll_dialog(tools_dir, reason="missing"):
                 )
                 if icon_handle:
                     break
-    except (AttributeError, OSError, ctypes.ArgumentError):
+    except (AttributeError, OSError, ctypes.ArgumentError):  # silent-ok: window icon is cosmetic; the dialog works without it
         icon_handle = None
 
     dialog_flags = 0x0001 | 0x0008  # TDF_ENABLE_HYPERLINKS | TDF_ALLOW_DIALOG_CANCELLATION
@@ -308,8 +311,8 @@ def _show_native_dll_dialog(tools_dir, reason="missing"):
         if notification == 3:  # TDN_HYPERLINK_CLICKED
             try:
                 webbrowser.open(ctypes.wstring_at(lparam))
-            except Exception:
-                pass
+            except Exception as exc:
+                log.warning(f"[DLL] Could not open the dialog link: {exc}")
         elif notification == 7:  # TDN_DIALOG_CONSTRUCTED
             try:
                 rect = wintypes.RECT()
@@ -334,8 +337,8 @@ def _show_native_dll_dialog(tools_dir, reason="missing"):
                         0x0004 | 0x0010,  # SWP_NOZORDER | SWP_NOACTIVATE
                     )
                     current_x += (bottom_right.x - top_left.x) + 8
-            except Exception:
-                pass
+            except Exception as exc:
+                log.debug(f"[DLL] Could not lay out dialog buttons: {exc}")
         return 0
 
     callback = callback_type(on_task_dialog_event)
@@ -356,7 +359,8 @@ def _show_native_dll_dialog(tools_dir, reason="missing"):
             None,
             None,
         )
-    except (AttributeError, OSError, ctypes.ArgumentError):
+    except (AttributeError, OSError, ctypes.ArgumentError) as exc:
+        log.debug(f"[DLL] Native task dialog unavailable, using fallback: {exc}")
         return None
 
     if result != 0:
@@ -364,8 +368,8 @@ def _show_native_dll_dialog(tools_dir, reason="missing"):
     if selected_button.value == button_open:
         try:
             subprocess.run(["explorer", str(tools_dir)], check=False)
-        except Exception:
-            pass
+        except Exception as exc:
+            log.warning(f"[DLL] Could not open the tools folder: {exc}")
     return False
 
 
@@ -413,8 +417,8 @@ def _show_dll_dialog(tools_dir, reason="missing") -> bool:
     if response == 1:
         try:
             subprocess.run(["explorer", str(tools_dir)], check=False)
-        except Exception:
-            pass
+        except Exception as exc:
+            log.warning(f"[DLL] Could not open the tools folder: {exc}")
     return False
 
     tools_dir.mkdir(parents=True, exist_ok=True)
@@ -474,7 +478,7 @@ def _show_dll_dialog(tools_dir, reason="missing") -> bool:
                     icon_image = tk.PhotoImage(file=str(icon_path))
                     root.iconphoto(True, icon_image)
                     break
-                except tk.TclError:
+                except tk.TclError:  # silent-ok: window icon is cosmetic; the next candidate is tried
                     pass
 
         def make_label(parent, **kwargs):
@@ -536,8 +540,8 @@ def _show_dll_dialog(tools_dir, reason="missing") -> bool:
         def on_open():
             try:
                 subprocess.run(["explorer", str(tools_dir)], check=False)
-            except Exception:
-                pass
+            except Exception as exc:
+                log.warning(f"[DLL] Could not open the tools folder: {exc}")
             root.destroy()
 
         def on_close():
@@ -546,8 +550,8 @@ def _show_dll_dialog(tools_dir, reason="missing") -> bool:
         def on_discord():
             try:
                 webbrowser.open("https://discord.gg/roseskins")
-            except Exception:
-                pass
+            except Exception as exc:
+                log.warning(f"[DLL] Could not open the Discord link: {exc}")
 
         def make_button(parent, label, command, bg_color, fg_color=text):
             return tk.Button(
@@ -580,7 +584,7 @@ def _show_dll_dialog(tools_dir, reason="missing") -> bool:
         root.mainloop()
         return False
 
-    except ImportError:
+    except ImportError:  # silent-ok: tkinter unavailable, falls back to a native MessageBox
         import ctypes
         msg = (
             f"{status_title}\n\n{status_body}\n\n{steps}\n\n"
@@ -594,13 +598,13 @@ def _show_dll_dialog(tools_dir, reason="missing") -> bool:
         if res == 6:
             try:
                 subprocess.run(["explorer", str(tools_dir)], check=False)
-            except Exception:
-                pass
+            except Exception as exc:
+                log.warning(f"[DLL] Could not open the tools folder: {exc}")
         elif res == 7:
             try:
                 webbrowser.open("https://discord.gg/roseskins")
-            except Exception:
-                pass
+            except Exception as exc:
+                log.warning(f"[DLL] Could not open the Discord link: {exc}")
         return False
 
 
@@ -634,13 +638,14 @@ def _check_dll_present() -> bool:
                     file_path.rename(target_dll_path)
                     valid_dll_found = True
                     break
-                except Exception:
+                except Exception as exc:
+                    log.debug(f"[DLL] Could not move {file_path.name}, trying a copy: {exc}")
                     try:
                         shutil.copy2(file_path, target_dll_path)
                         valid_dll_found = True
                         break
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        log.warning(f"[DLL] Could not install candidate {file_path}: {exc}")
 
     if valid_dll_found:
         return True
@@ -756,7 +761,7 @@ def _update_registry_version() -> None:
         key_path = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Rose"
         with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key_path, 0, winreg.KEY_SET_VALUE) as key:
             winreg.SetValueEx(key, "DisplayVersion", 0, winreg.REG_SZ, APP_VERSION)
-    except Exception:
+    except Exception:  # silent-ok: runs before logging is configured
         pass
 
 
@@ -909,7 +914,7 @@ if __name__ == "__main__":
                 details={"type": type(e).__name__, "error": str(e)},
                 hint="Check %LOCALAPPDATA%\\Rose\\logs\\ for details.",
             )
-        except Exception:
+        except Exception:  # silent-ok: already on the fatal-error path; the original error was logged above
             pass
         
         error_msg = f"""
@@ -946,7 +951,7 @@ Log location: Check %LOCALAPPDATA%\\Rose\\logs\\
                     "Rose - Fatal Error",
                     0x50010  # MB_OK | MB_ICONERROR | MB_SETFOREGROUND | MB_TOPMOST
                 )
-            except Exception:
+            except Exception:  # silent-ok: last-resort error dialog on the fatal-error path
                 pass
         
         sys.exit(1)

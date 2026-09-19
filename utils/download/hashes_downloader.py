@@ -197,7 +197,7 @@ class HashesDownloader:
             # as a success, leaving injection broken until the next patch.
             try:
                 declared = int(expected) if expected is not None else None
-            except ValueError:
+            except ValueError:  # silent-ok: malformed header leaves nothing to compare against
                 declared = None  # malformed header: nothing to compare against
             if declared is not None and received != declared:
                 log.error(f"{filename} is truncated: got {received} of {declared} bytes")

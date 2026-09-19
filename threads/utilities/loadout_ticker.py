@@ -63,6 +63,7 @@ class LoadoutTicker(threading.Thread):
         last_poll = 0.0
         last_bucket = None
         last_logged_name = object()
+        champion_name_error_logged = False
 
         # Continue loop only in ChampSelect/FINALIZATION
         while (not self.state.stop) and self.state.loadout_countdown_active and (self.state.current_ticker == self.ticker_id) and (self.state.phase in ["ChampSelect", "FINALIZATION"]):
@@ -124,13 +125,26 @@ class LoadoutTicker(threading.Thread):
                     champ_id = self.state.locked_champ_id or self.state.hovered_champ_id
                     if champ_id and self.skin_scraper and self.skin_scraper.cache.is_loaded_for_champion(champ_id):
                         cname = self.skin_scraper.cache.champion_name or ""
-                except Exception:
-                    pass
+                except Exception as e:
+                    # This runs on every tick inside the threshold window, so report once.
+                    if not champion_name_error_logged:
+                        champion_name_error_logged = True
+                        log.debug(f"[loadout] Champion name unavailable for injection label: {e}")
 
                 # Resolve injection name
                 name = self.skin_name_resolver.resolve_injection_name()
                 if name != last_logged_name:
                     log.debug(f"[INJECT] Final name variable: '{name}'")
+                    if name is None:
+                        log.warning(
+                            "[INJECT] No skin to inject at threshold: "
+                            f"locked_champ_id={self.state.locked_champ_id}, "
+                            f"ui_last_text={self.state.ui_last_text!r}, "
+                            f"last_hovered_skin_id={self.state.last_hovered_skin_id}, "
+                            f"selected_skin_id={self.state.selected_skin_id}, "
+                            f"game_mode={getattr(self.state, 'current_game_mode', None)}, "
+                            f"phase={self.state.phase}"
+                        )
                     last_logged_name = name
 
                 if name:

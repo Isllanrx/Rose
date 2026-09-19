@@ -36,7 +36,7 @@ def is_junction(path: Union[str, Path]) -> bool:
         attrs = getattr(st, "st_file_attributes", 0)
         # FILE_ATTRIBUTE_REPARSE_POINT = 0x0400
         return bool(attrs & stat.FILE_ATTRIBUTE_REPARSE_POINT)
-    except (OSError, ValueError, AttributeError):
+    except (OSError, ValueError, AttributeError):  # silent-ok: unreadable attributes mean it is not a junction
         return False
 
 
@@ -98,8 +98,8 @@ def safe_remove_entry(path: Union[str, Path]) -> None:
     if path.exists():
         try:
             path.unlink()
-        except OSError:
-            pass
+        except OSError as err:
+            log.debug(f"[JUNCTION] Could not remove {path}: {err}")
 
 
 # ---------------------------------------------------------------------------
@@ -124,7 +124,7 @@ def _get_or_extract_to_cache(
     stamp = cache_dir / f"{folder_name}.mtime"
     try:
         source_mtime = str(zip_path.stat().st_mtime)
-    except OSError:
+    except OSError:  # silent-ok: empty stamp forces a re-extract
         source_mtime = ""
 
     needs_extract = True
@@ -134,7 +134,7 @@ def _get_or_extract_to_cache(
             if stored_mtime == source_mtime:
                 needs_extract = False
                 log.debug(f"[JUNCTION] Cache hit for {folder_name}")
-        except OSError:
+        except OSError:  # silent-ok: unreadable stamp forces a re-extract
             pass
 
     if needs_extract:
@@ -149,8 +149,8 @@ def _get_or_extract_to_cache(
         # Write mtime stamp
         try:
             stamp.write_text(source_mtime)
-        except OSError:
-            pass
+        except OSError as exc:
+            log.debug(f"[JUNCTION] Could not write the cache stamp {stamp}: {exc}")
 
     return cached
 

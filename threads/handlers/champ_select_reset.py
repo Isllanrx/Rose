@@ -34,7 +34,8 @@ def perform_champ_select_reset(state, lcu) -> bool:
     state.selected_skin_id = None
     try:
         state.owned_skin_ids.clear()
-    except Exception:
+    except Exception as exc:
+        log.debug("[reset] owned_skin_ids was not a set (%s); replacing it", exc)
         state.owned_skin_ids = set()
 
     state.last_hover_written = False
@@ -56,7 +57,8 @@ def perform_champ_select_reset(state, lcu) -> bool:
 
     try:
         state.processed_action_ids.clear()
-    except Exception:
+    except Exception as exc:
+        log.debug("[reset] processed_action_ids was not a set (%s); replacing it", exc)
         state.processed_action_ids = set()
 
     try:

@@ -31,6 +31,7 @@ class SkinNameResolver:
         self._no_skin_id_last_log_ts: float = 0.0
         self._no_skin_id_last_payload = None
         self._no_skin_id_suppressed: int = 0
+        self._label_error_logged = False
 
     def _log_no_skin_id_available(self) -> None:
         """Rate-limit 'no skin id' logs to avoid spam in tight polling loops."""
@@ -206,6 +207,10 @@ class SkinNameResolver:
                 final_label = (base_clean + (" " + c_clean if c_clean else "")).strip()
             
             return final_label
-        except Exception:
+        except Exception as e:
+            # Polled from the loadout ticker loop, so report once per resolver.
+            if not self._label_error_logged:
+                self._label_error_logged = True
+                log.debug(f"[INJECT] Falling back to raw skin label '{raw}': {e}")
             return raw or ""
 

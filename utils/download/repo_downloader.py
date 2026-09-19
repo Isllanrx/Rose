@@ -231,8 +231,8 @@ class RepoDownloader:
                 while dir_path != self.target_dir and dir_path.exists() and not any(dir_path.iterdir()):
                     dir_path.rmdir()
                     dir_path = dir_path.parent
-            except OSError:
-                pass
+            except OSError as exc:
+                log.debug(f"Could not prune empty folder {dir_path}: {exc}")
 
         log.info(f"Incremental update: {success_count} succeeded, {fail_count} failed out of {total}")
         return fail_count == 0
@@ -264,9 +264,10 @@ class RepoDownloader:
                     total_size_header = head_response.headers.get('Content-Length')
                     if total_size_header:
                         total_size = int(total_size_header)
-                except requests.RequestException:
+                except requests.RequestException as exc:
+                    log.debug(f"HEAD request for the download size failed: {exc}")
                     total_size = None
-                except ValueError:
+                except ValueError:  # silent-ok: size is only used for progress
                     total_size = None
 
                 # Download ZIP file
@@ -276,7 +277,7 @@ class RepoDownloader:
                     total_size_header = response.headers.get('Content-Length')
                     try:
                         total_size = int(total_size_header) if total_size_header else None
-                    except ValueError:
+                    except ValueError:  # silent-ok: size is only used for progress
                         total_size = None
                 downloaded = 0
                 last_emit = -1
@@ -415,7 +416,7 @@ class RepoDownloader:
                 relative_path = local_file.relative_to(target_dir)
                 # Normalize separators and case for case-insensitive comparison
                 relative_path_str = str(relative_path).replace('\\', '/').lower()
-            except ValueError:
+            except ValueError:  # silent-ok: file outside the target folder is skipped
                 # File is not under target_dir (shouldn't happen, but skip if it does)
                 continue
             
@@ -818,10 +819,10 @@ class RepoDownloader:
                                     total_chromas += 1
                                 if chroma_png.exists():
                                     total_previews += 1
-                            except ValueError:
+                            except ValueError:  # silent-ok: entry is not a skin/chroma directory; skipped by design
                                 # Not a chroma directory, skip
                                 continue
-                except ValueError:
+                except ValueError:  # silent-ok: entry is not a skin/chroma directory; skipped by design
                     # Not a skin directory, skip
                     continue
         

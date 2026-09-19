@@ -13,7 +13,7 @@ from typing import Optional
 
 try:
     from PIL import Image
-except ImportError:
+except ImportError:  # silent-ok: optional dependency; the feature degrades without it
     Image = None
 
 from config import APP_VERSION
@@ -221,7 +221,7 @@ class UpdateDialog(Win32Window):
             if self._icon_temp_path:
                 try:
                     os.remove(self._icon_temp_path)
-                except OSError:
+                except OSError:  # silent-ok: temp icon cleanup is best-effort
                     pass
 
     def _prepare_window_icon(self) -> Optional[str]:
@@ -307,7 +307,7 @@ class UpdateDialog(Win32Window):
             else:
                 text = self._format_bytes(self._transfer_bytes)
             self.set_transfer_text(text)
-        except Exception:
+        except Exception:  # silent-ok: progress text is cosmetic
             pass
 
     def _render_status_text(self) -> None:

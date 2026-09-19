@@ -165,6 +165,7 @@ class ConfigManager:
                 return str(parent_dir)
             
             return None
-        except Exception:
+        except Exception as exc:
+            log.debug(f"Could not infer the client path from the League path: {exc}")
             return None
 

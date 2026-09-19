@@ -137,8 +137,8 @@ class WebSocketConnection:
             try:
                 self.ws.close()
                 log.debug("[ws] WebSocket closed on thread exit")
-            except Exception:
-                pass
+            except Exception as exc:
+                log.debug(f"[ws] WebSocket close on thread exit failed: {exc}")
 
     def _on_open(self, ws):
         """WebSocket connection opened"""
@@ -199,8 +199,8 @@ class WebSocketConnection:
             try:
                 self.ws.close()
                 log.debug("[ws] WebSocket close requested")
-            except Exception:
-                pass
+            except Exception as exc:
+                log.debug(f"[ws] WebSocket close request failed: {exc}")
 
     def _wait_before_retry(self, reason: str) -> bool:
         """Wait with bounded exponential backoff and return whether stopping."""

@@ -245,7 +245,8 @@ class StunClient:
             bound_ip, local_port = sock.getsockname()[:2]
             # Bind address 0.0.0.0 is not valid for token (can't send to it); use real LAN IP
             local_ip = self._get_local_ip() if bound_ip == "0.0.0.0" else bound_ip
-        except OSError:
+        except OSError as exc:
+            log.debug(f"[STUN] Could not read the socket address, using the LAN IP: {exc}")
             local_ip = self._get_local_ip()
             local_port = 0
 
@@ -352,5 +353,6 @@ class StunClient:
             with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
                 s.connect(("8.8.8.8", 80))
                 return s.getsockname()[0]
-        except Exception:
+        except Exception as exc:
+            log.debug(f"[STUN] Could not determine the LAN IP, using loopback: {exc}")
             return "127.0.0.1"

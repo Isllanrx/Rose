@@ -17,7 +17,7 @@ def is_loopback_origin(origin: str | None) -> bool:
 
     try:
         parsed = urlparse(origin)
-    except ValueError:
+    except ValueError:  # silent-ok: malformed origin is rejected
         return False
 
     if parsed.scheme not in {"http", "https"}:

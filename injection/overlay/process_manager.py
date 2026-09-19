@@ -13,7 +13,7 @@ from pathlib import Path
 try:
     import psutil
     PSUTIL_AVAILABLE = True
-except ImportError:
+except ImportError:  # silent-ok: optional dependency; PSUTIL_AVAILABLE gates every use
     PSUTIL_AVAILABLE = False
     psutil = None
 
@@ -43,7 +43,8 @@ class ProcessManager:
                 self.current_overlay_process.terminate()
                 try:
                     self.current_overlay_process.wait(timeout=PROCESS_TERMINATE_TIMEOUT_S)
-                except subprocess.TimeoutExpired:
+                except subprocess.TimeoutExpired as exc:
+                    log.debug(f"[INJECT] runoverlay did not terminate in time, killing it: {exc}")
                     self.current_overlay_process.kill()
                     self.current_overlay_process.wait()
                 self.current_overlay_process = None
@@ -110,7 +111,7 @@ class ProcessManager:
                         log.debug(f"[INJECT] Timeout fetching cmdline for PID {proc.info['pid']}")
                         continue
 
-                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):  # silent-ok: process ended or is protected while iterating; expected
                     # Process might have already ended or we don't have access
                     pass
                 except Exception as e:
@@ -176,7 +177,7 @@ class ProcessManager:
                             log.debug(f"[INJECT] Unexpected error force killing process: {kill_e}")
                     killed_count += 1
 
-                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):  # silent-ok: process ended or is protected while iterating; expected
                     # Process might have already ended or we don't have access
                     pass
                 except Exception as e:

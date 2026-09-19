@@ -105,7 +105,7 @@ class LCUConnection:
             self.session.headers.update({"Content-Type": "application/json"})
             self.ok = True
             log_section(log, "LCU Connected", "", {"Port": self.port, "Status": "Ready"})
-        except Exception as e:
+        except Exception as e:  # silent-ok: reported by _disable
             self._disable(f"LCU unavailable: {e}")
     
     def _disable(self, reason: str):

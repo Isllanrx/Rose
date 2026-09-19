@@ -69,7 +69,7 @@ def initialize_core_components(args, injection_threshold: Optional[float] = None
                     "Rose - Initialization Error",
                     0x50010  # MB_OK | MB_ICONERROR | MB_SETFOREGROUND | MB_TOPMOST
                 )
-            except Exception:
+            except Exception:  # silent-ok: last-resort error dialog; the error was logged above
                 pass
         sys.exit(1)
     
@@ -109,7 +109,7 @@ def initialize_core_components(args, injection_threshold: Optional[float] = None
                     "Rose - Injection Error",
                     0x50010  # MB_OK | MB_ICONERROR | MB_SETFOREGROUND | MB_TOPMOST
                 )
-            except Exception:
+            except Exception:  # silent-ok: last-resort error dialog; the error was logged above
                 pass
         sys.exit(1)
     

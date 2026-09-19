@@ -71,6 +71,7 @@ class SkinMapping:
             try:
                 skin_id = int(skin_id_str)
             except (TypeError, ValueError):
+                log.debug(f"[SkinMonitor] Ignoring non-numeric skin id {skin_id_str!r} in mapping")
                 continue
             original_name = (name or "").strip()
             normalized = original_name.lower()

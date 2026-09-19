@@ -137,7 +137,7 @@ class PartyManager:
                 task.cancel()
                 try:
                     await task
-                except asyncio.CancelledError:
+                except asyncio.CancelledError:  # silent-ok: cancellation is the normal shutdown path
                     pass
 
         self._lobby_check_task = None
@@ -199,7 +199,7 @@ class PartyManager:
             log.info(f"[PARTY] Joined party room {target_room_key[:8]}...")
             return True, None
 
-        except ValueError as e:
+        except ValueError as e:  # silent-ok: turned into the returned error message
             error_str = str(e)
             if "expired" in error_str.lower():
                 return False, "Token has expired. Ask your friend for a new one."
@@ -336,7 +336,7 @@ class PartyManager:
                         else:
                             log.info(f"[PARTY] Peer {name} left our lobby")
 
-            except asyncio.CancelledError:
+            except asyncio.CancelledError:  # silent-ok: cancellation is the normal shutdown path
                 break
             except Exception as e:
                 log.info(f"[PARTY] Lobby check error: {e}")
@@ -367,7 +367,7 @@ class PartyManager:
                     last_custom_mod = custom_mod_key
                     await self.broadcast_skin_update()
 
-            except asyncio.CancelledError:
+            except asyncio.CancelledError:  # silent-ok: cancellation is the normal shutdown path
                 break
             except Exception as e:
                 log.info(f"[PARTY] Skin broadcast error: {e}")
@@ -425,7 +425,8 @@ class PartyManager:
                                 h.update(chunk)
                         if h.hexdigest()[:16] == content_hash:
                             return str(mod_file.relative_to(mods_root))
-                    except Exception:
+                    except Exception as exc:
+                        log.debug(f"[PARTY] Could not hash local mod {mod_file}: {exc}")
                         continue
         except Exception as e:
             log.debug(f"[PARTY] Error searching local mods: {e}")

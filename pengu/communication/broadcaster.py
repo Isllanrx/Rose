@@ -150,7 +150,8 @@ class Broadcaster:
                             break
                     if skin_name is None:
                         skin_name = Path(str(custom_path)).name
-                except Exception:
+                except Exception as exc:
+                    log.debug(f"[HISTORIC] Could not resolve the historic mod name: {exc}")
                     skin_name = None
             else:
                 # Check if this is a chroma ID
@@ -204,7 +205,8 @@ class Broadcaster:
         target_skin_ids = selected_custom_mod.get("target_skin_ids", []) if selected_custom_mod else []
         try:
             target_skin_ids = sorted({int(value) for value in target_skin_ids if int(value) > 0})
-        except (TypeError, ValueError):
+        except (TypeError, ValueError) as exc:
+            log.debug(f"[CustomMods] Invalid target_skin_ids in the selected mod: {exc}")
             target_skin_ids = []
         payload = {
             "type": "custom-mod-state",
@@ -356,7 +358,7 @@ class Broadcaster:
         """Send message to all connected clients"""
         try:
             running_loop = asyncio.get_running_loop()
-        except RuntimeError:
+        except RuntimeError:  # silent-ok: no running loop is the normal off-loop case
             running_loop = None
 
         if running_loop is self.websocket_server.loop:
@@ -394,7 +396,8 @@ class Broadcaster:
                 chromas = self.skin_scraper.get_chromas_for_skin(skin_id)
                 if chromas:
                     return True
-            except Exception:
+            except Exception as exc:
+                log.debug(f"[CHROMA] Could not read chromas for skin {skin_id}: {exc}")
                 return False
         
         return False

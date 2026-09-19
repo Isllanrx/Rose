@@ -52,6 +52,7 @@ class InjectionTrigger:
         try:
             requested = int(skin_id)
         except (TypeError, ValueError):
+            log.debug(f"[INJECT] Ignoring invalid skin id {skin_id!r} for compatibility check")
             return set()
 
         compatible = {requested}
@@ -60,8 +61,8 @@ class InjectionTrigger:
         if chroma_map and requested in chroma_map:
             try:
                 compatible.add(int(chroma_map[requested]["skinId"]))
-            except (KeyError, TypeError, ValueError):
-                pass
+            except (KeyError, TypeError, ValueError) as e:
+                log.debug(f"[INJECT] Chroma {requested} has no usable base skin id: {e}")
         return compatible
 
     @staticmethod
@@ -69,10 +70,12 @@ class InjectionTrigger:
         try:
             target_ids = getattr(entry, "target_skin_ids", ()) or ()
             return {int(value) for value in target_ids if int(value) > 0}
-        except (AttributeError, TypeError, ValueError):
+        except (AttributeError, TypeError, ValueError) as e:
+            log.debug(f"[INJECT] Mod entry has invalid target_skin_ids ({e}); falling back to skin_id")
             try:
                 return {int(entry.skin_id)}
-            except (AttributeError, TypeError, ValueError):
+            except (AttributeError, TypeError, ValueError) as e:
+                log.debug(f"[INJECT] Mod entry has no usable skin id: {e}")
                 return set()
 
     @staticmethod
@@ -93,12 +96,14 @@ class InjectionTrigger:
         try:
             target_skin_id = int(custom_mod.get("skin_id"))
         except (TypeError, ValueError):
+            log.debug(f"[INJECT] Custom mod has invalid skin_id {custom_mod.get('skin_id')!r}; no carrier")
             return None
 
         champion_value = custom_mod.get("champion_id") or fallback_champion_id
         try:
             champion_id = int(champion_value)
         except (TypeError, ValueError):
+            log.debug(f"[INJECT] Custom mod has invalid champion id {champion_value!r}; no carrier")
             return None
 
         if target_skin_id <= 0:
@@ -109,6 +114,7 @@ class InjectionTrigger:
         try:
             selected_chroma = int(selected_chroma_id) if selected_chroma_id else None
         except (TypeError, ValueError):
+            log.debug(f"[INJECT] Ignoring invalid selected chroma {selected_chroma_id!r} for carrier")
             selected_chroma = None
 
         # Regular chroma IDs are stored as the target skin ID plus a small
@@ -134,6 +140,7 @@ class InjectionTrigger:
         try:
             return int(skin_id) // 1000 == int(champion_id)
         except (TypeError, ValueError):
+            log.debug(f"[INJECT] Cannot compare skin {skin_id!r} with champion {champion_id!r}")
             return False
 
     def trigger_injection(self, name: str, ticker_id: int, cname: str = ""):
@@ -265,7 +272,8 @@ class InjectionTrigger:
                                     relative_path = str(
                                         entry.path.relative_to(mod_storage.mods_root)
                                     ).replace(chr(92), "/")
-                                except (ValueError, AttributeError):
+                                except (ValueError, AttributeError) as e:
+                                    log.debug(f"[HISTORIC] Skipping mod outside the mods root: {e}")
                                     continue
                                 if relative_path.casefold() == historic_custom_mod_path.casefold():
                                     matching_entry = entry
@@ -293,6 +301,10 @@ class InjectionTrigger:
                                 )
                                 historic_custom_mod_path = None
                 except Exception:
+                    log.warning(
+                        "[HISTORIC] Could not resolve the saved custom mod; auto-selection skipped",
+                        exc_info=True,
+                    )
                     historic_custom_mod_path = None
 
             if not selected_custom_mod and historic_custom_mod_path:
@@ -931,7 +943,8 @@ class InjectionTrigger:
                                 try:
                                     full_path = mods_root / relative_path.replace("/", "\\")
                                     return full_path.exists()
-                                except Exception:
+                                except Exception as e:
+                                    log.debug(f"[HISTORIC] Cannot check mod file {relative_path!r}: {e}")
                                     return False
 
                             # Check and clean map mod

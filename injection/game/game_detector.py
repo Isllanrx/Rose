@@ -12,7 +12,7 @@ from typing import Optional, Tuple
 try:
     import psutil
     PSUTIL_AVAILABLE = True
-except ImportError:
+except ImportError:  # silent-ok: optional dependency; PSUTIL_AVAILABLE gates every use
     PSUTIL_AVAILABLE = False
     psutil = None
 
@@ -113,7 +113,7 @@ class GameDetector:
                                     log_success(log, f"Found League via parent directory: game={parent_league_dir}, client={client_dir}", "")
                                     return parent_league_dir, client_dir
                                 
-                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):  # silent-ok: process ended or is protected while iterating; expected
                     continue
             
             log.debug("No LeagueClient.exe process found")

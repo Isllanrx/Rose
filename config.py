@@ -51,7 +51,7 @@ def _reload_config() -> None:
     # Check file mtime, skip re-read if unchanged
     try:
         current_mtime = config_path.stat().st_mtime
-    except OSError:
+    except OSError:  # silent-ok: missing config file is normal; mtime 0 forces a re-read
         current_mtime = 0.0
 
     if current_mtime == _CONFIG_MTIME and _CONFIG.sections():
@@ -83,6 +83,7 @@ def get_config_float(section: str, option: str, fallback: float) -> float:
     try:
         return float(value)
     except ValueError:
+        log.warning(f"[Config] Invalid number {value!r}, using default {fallback!r}")
         return fallback
 
 
