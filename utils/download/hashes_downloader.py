@@ -9,11 +9,66 @@ Checks for updates based on latest commit SHA
 import json
 import requests
 from pathlib import Path
-from typing import Optional, Dict
+from typing import IO, Optional, Dict
+from utils.core.atomic_file import atomic_write
 from utils.core.logging import get_logger
 from config import APP_USER_AGENT, RATE_LIMIT_REQUEST_TIMEOUT
 
 log = get_logger()
+
+_DOWNLOAD_CHUNK_BYTES = 1 << 20
+_HASHES_PART_COUNT = 9
+
+
+class _HashesDownloadFailed(Exception):
+    """A part failed mid-download, so the installed file must stay untouched."""
+
+    def __init__(self, filename: str) -> None:
+        super().__init__(filename)
+        self.filename = filename
+
+
+class _JoinedPartWriter:
+    """Joins the downloaded parts with exactly one newline between them.
+
+    Byte for byte the same output as the previous in-memory merge, which rstripped
+    every part and joined them, but holding one chunk instead of four copies of the
+    whole 230 MB file. Trailing newlines are held back rather than written, because
+    only the following chunk says whether they are interior or trailing.
+    """
+
+    def __init__(self, handle: IO[bytes]) -> None:
+        self._handle = handle
+        self._held = b''
+        self._part_index = 0
+        self._last_byte = b''
+        self.bytes_written = 0
+
+    def _emit(self, data: bytes) -> None:
+        if not data:
+            return
+        self._handle.write(data)
+        self.bytes_written += len(data)
+        self._last_byte = data[-1:]
+
+    def start_part(self) -> None:
+        if self._part_index:
+            self._emit(b'\n')
+        self._part_index += 1
+        self._held = b''
+
+    def feed(self, chunk: bytes) -> None:
+        stripped = chunk.rstrip(b'\n')
+        if stripped:
+            self._emit(self._held)
+            self._emit(stripped)
+            self._held = chunk[len(stripped):]
+        else:
+            self._held += chunk
+
+    def finish(self) -> None:
+        if self.bytes_written and self._last_byte != b'\n':
+            self._emit(b'\n')
 
 
 class HashesDownloader:
@@ -120,84 +175,64 @@ class HashesDownloader:
         log.debug("Hashes unchanged, skipping download")
         return False
     
-    def download_hashes_file(self, filename: str) -> Optional[bytes]:
-        """Download a single hashes file from GitHub raw content"""
+    def _stream_hashes_file(self, filename: str, writer: "_JoinedPartWriter") -> bool:
+        """Stream one hashes part straight into *writer*, never holding it in memory."""
         url = f"{self.raw_base}/{self.hashes_path}/{filename}"
-        
+
         try:
             log.info(f"Downloading {filename}...")
-            response = self.session.get(url, timeout=RATE_LIMIT_REQUEST_TIMEOUT)
-            response.raise_for_status()
-            log.info(f"Downloaded {filename} ({len(response.content)} bytes)")
-            return response.content
+            start = writer.bytes_written
+            with self.session.get(
+                url, timeout=RATE_LIMIT_REQUEST_TIMEOUT, stream=True
+            ) as response:
+                response.raise_for_status()
+                for chunk in response.iter_content(chunk_size=_DOWNLOAD_CHUNK_BYTES):
+                    if chunk:
+                        writer.feed(chunk)
+            log.info(f"Downloaded {filename} ({writer.bytes_written - start} bytes)")
+            return True
         except requests.HTTPError as e:
-            if e.response and e.response.status_code == 404:
+            if e.response is not None and e.response.status_code == 404:
                 log.error(f"File not found: {filename}")
-            elif e.response and e.response.status_code in (403, 429):
+            elif e.response is not None and e.response.status_code in (403, 429):
                 log.error(f"GitHub API rate limit exceeded while downloading {filename}")
             else:
                 log.error(f"Failed to download {filename}: {e}")
-            return None
+            return False
         except requests.RequestException as e:
             log.error(f"Failed to download {filename}: {e}")
-            return None
-    
-    def merge_hashes_files(self, contents: list[bytes]) -> bytes:
-        """Merge multiple hashes.game.txt.N files into hashes.game.txt"""
-        try:
-            texts = []
-            for content in contents:
-                text = content.decode('utf-8', errors='replace')
-                texts.append(text)
-            
-            # Combine them with newline separators, avoiding double newlines
-            merged = '\n'.join(t.rstrip('\n') for t in texts)
-            if merged and not merged.endswith('\n'):
-                merged += '\n'
-            
-            return merged.encode('utf-8')
-        except Exception as e:
-            log.error(f"Failed to merge hashes files: {e}")
-            raise
-    
+            return False
+
     def download_and_merge_hashes(self) -> bool:
-        """Download and merge hashes files into hashes.game.txt"""
+        """Download every hashes part and write them out as a single file."""
         try:
-            # Download all 9 hashes files
-            contents = []
-            for i in range(9):
-                filename = f"hashes.game.txt.{i}"
-                content = self.download_hashes_file(filename)
-                if content is None:
-                    log.error(f"Failed to download {filename}")
-                    return False
-                contents.append(content)
-            
-            # Merge the files
-            log.info("Merging hashes files...")
-            merged_content = self.merge_hashes_files(contents)
-            
-            # Ensure tools directory exists
             self.tools_dir.mkdir(parents=True, exist_ok=True)
-            
-            # Write merged file
-            log.info(f"Writing hashes.game.txt to {self.hashes_file}...")
-            with open(self.hashes_file, 'wb') as f:
-                f.write(merged_content)
-            
-            log.info(f"Successfully created hashes.game.txt ({len(merged_content)} bytes)")
-            
-            # Update state
+
+            # durable=False per ADR-006: the state file is only written after the
+            # swap, so an interrupted download is simply redone on the next run.
+            with atomic_write(self.hashes_file, "wb", durable=False) as handle:
+                writer = _JoinedPartWriter(handle)
+                for index in range(_HASHES_PART_COUNT):
+                    writer.start_part()
+                    if not self._stream_hashes_file(f"hashes.game.txt.{index}", writer):
+                        raise _HashesDownloadFailed(f"hashes.game.txt.{index}")
+                writer.finish()
+                total_bytes = writer.bytes_written
+
+            log.info(f"Successfully created hashes.game.txt ({total_bytes} bytes)")
+
             latest_sha = self.get_latest_commit_sha()
             if latest_sha:
-                state = {
+                self.save_local_state({
                     'last_commit_sha': latest_sha,
-                    'file_size': len(merged_content)
-                }
-                self.save_local_state(state)
-            
+                    'file_size': total_bytes,
+                })
+
             return True
-            
+
+        except _HashesDownloadFailed as e:
+            log.error(f"Failed to download {e.filename}; keeping the previous hashes file")
+            return False
         except Exception as e:
             log.error(f"Failed to download and merge hashes: {e}")
             return False
