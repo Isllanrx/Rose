@@ -115,7 +115,7 @@ class UpdateInstaller:
             try:
                 target_path.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(source_path, target_path)
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:  # noqa: BLE001  # silent-ok: reported through status_callback
                 status_callback(f"Warning: failed to preserve {relative_name}: {exc}")
 
         # Preserve user-provided files (e.g., DLL that users must provide themselves)
@@ -128,7 +128,7 @@ class UpdateInstaller:
                 target_path.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(source_path, target_path)
                 updater_log.info(f"Preserved user file: {relative_name}")
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:  # noqa: BLE001  # silent-ok: reported through status_callback
                 status_callback(f"Warning: failed to preserve {relative_name}: {exc}")
 
         # Create batch script for installation

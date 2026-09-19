@@ -19,7 +19,7 @@ def _read_install_id(path: Path) -> Optional[str]:
     try:
         value = path.read_text(encoding="utf-8").strip()
         parsed = uuid.UUID(value)
-    except (OSError, ValueError):
+    except (OSError, ValueError):  # silent-ok: missing or corrupt id file makes the caller create a new id
         return None
 
     return str(parsed)

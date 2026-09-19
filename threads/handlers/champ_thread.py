@@ -57,7 +57,7 @@ class ChampThread(threading.Thread):
             self.state.historic_mode_active = False
             self.state.historic_skin_id = None
             self.state.historic_first_detection_done = False
-        except Exception:
+        except Exception:  # silent-ok: ChampThread is never instantiated (backlog #69)
             pass
 
         # Clear cache to detect new champion's skin
@@ -87,7 +87,7 @@ class ChampThread(threading.Thread):
             ui = get_user_interface(self.state, self.skin_scraper)
             if ui:
                 ui._try_show_click_blocker()
-        except Exception:
+        except Exception:  # silent-ok: ChampThread is never instantiated (backlog #69)
             pass
         
         log.info(f"[exchange] Champion exchange complete - ready for {new_champ_label}")
@@ -115,7 +115,7 @@ class ChampThread(threading.Thread):
                 return
 
             sp.process_skin_name(cached.strip(), broadcaster=bc)
-        except Exception:
+        except Exception:  # silent-ok: ChampThread is never instantiated (backlog #69)
             pass
 
     def run(self):
@@ -133,7 +133,7 @@ class ChampThread(threading.Thread):
                 sel = self.lcu.my_selection or {}
                 try: 
                     cid = int(sel.get("selectedChampionId") or 0) or None
-                except Exception: 
+                except Exception:  # silent-ok: ChampThread is never instantiated (backlog #69)
                     cid = None
             
             if cid and cid != self.last_hover:
@@ -211,6 +211,6 @@ class ChampThread(threading.Thread):
                                 self.state.ui_skin_thread._broadcast_historic_state()
                         except Exception as e:
                             log.debug(f"[lock:champ] Failed to broadcast historic state reset: {e}")
-            except Exception:
+            except Exception:  # silent-ok: ChampThread is never instantiated (backlog #69)
                 pass
             time.sleep(self.interval)

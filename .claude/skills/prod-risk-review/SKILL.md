@@ -22,6 +22,8 @@ uvx ruff@latest check . --exclude .venv,vendor,build,dist,relay-worker,skin-key-
 ```
 basedpyright em modo `standard`, considerando só: `reportPossiblyUnbound`, `reportOptionalMemberAccess`, `reportOptionalSubscript`, `reportUndefinedVariable`, `reportCallIssue`, `reportAttributeAccessIssue` (os demais são tipagem).
 
+Guarda automática de erro silencioso (ADR-008): `python -m unittest test.test_no_silent_exceptions` lista todo `except` sem log, `raise` ou `# silent-ok: <motivo>`. Rodar sempre; revisar se cada `silent-ok` novo é mesmo fluxo esperado e se log novo não está em loop quente (DEBUG é gravado em produção enquanto o #70 não for feito).
+
 ## Checklist por categoria
 
 ### 1. Threads e concorrência

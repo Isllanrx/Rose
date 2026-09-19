@@ -58,10 +58,12 @@ def load_historic_target_map() -> Dict[str, int]:
                 target_id = int(value)
                 if target_id > 0:
                     result[str(int(key))] = target_id
-            except (TypeError, ValueError):
+            except (TypeError, ValueError) as exc:
+                log.debug(f"[HISTORIC] Ignoring invalid target map entry: {exc}")
                 continue
         return result
-    except Exception:
+    except Exception as exc:
+        log.warning(f"[HISTORIC] Could not load the historic target map: {exc}")
         return {}
 
 
@@ -119,11 +121,13 @@ def load_historic_map() -> Dict[str, Union[int, str]]:
                         result[key] = int(v)
                     elif isinstance(v, str):
                         result[key] = str(v)
-                except Exception:
+                except Exception as exc:
+                    log.debug(f"[HISTORIC] Ignoring invalid historic entry: {exc}")
                     continue
             return result
         return {}
-    except Exception:
+    except Exception as exc:
+        log.warning(f"[HISTORIC] Could not load the historic map: {exc}")
         return {}
 
 

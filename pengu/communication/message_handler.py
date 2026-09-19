@@ -68,8 +68,8 @@ def _choose_mod_file() -> Optional[Path]:
         root.withdraw()
         try:
             root.attributes("-topmost", True)
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug(f"[CustomMods] Could not keep the file dialog on top: {e}")
         selected = filedialog.askopenfilename(
             title="Select a Rose mod file",
             filetypes=[
@@ -87,8 +87,8 @@ def _choose_mod_file() -> Optional[Path]:
         if root is not None:
             try:
                 root.destroy()
-            except Exception:
-                pass
+            except Exception as e:
+                log.debug(f"[CustomMods] Could not destroy the file dialog root: {e}")
 
 
 class MessageHandler:
@@ -146,7 +146,8 @@ class MessageHandler:
             if game_dir.exists() and game_dir.is_dir():
                 league_exe = game_dir / "League of Legends.exe"
                 return league_exe.exists() and league_exe.is_file()
-        except Exception:
+        except Exception as e:
+            log.debug(f"[Settings] Could not validate League path {game_path!r}: {e}")
             return False
 
         return False
@@ -589,7 +590,8 @@ class MessageHandler:
             # Preserve trailing newline style expected by the reader
             p.write_text("\n".join(kept_lines) + ("\n" if kept_lines else ""), encoding="utf-8", errors="ignore")
             return True
-        except Exception:
+        except Exception as e:
+            log.warning(f"[Diagnostics] Could not clear issue categories: {e}")
             return False
 
     def _handle_diagnostics_request(self, payload: dict) -> None:
@@ -660,8 +662,8 @@ class MessageHandler:
                         hh, mm = hhmm.split(":")
                         dt = datetime(now.year, int(mon), int(day), int(hh), int(mm))
                         return dt.strftime("%d/%m/%y %H:%M")
-                except Exception:
-                    pass
+                except Exception as e:
+                    log.debug(f"[Diagnostics] Could not format timestamp {ts_part!r}: {e}")
                 return ts_part
 
             def _summarize(msg: str, fix: str) -> Optional[dict]:
@@ -679,13 +681,15 @@ class MessageHandler:
                         if not m:
                             return None
                         return float(m.group(1))
-                    except Exception:
+                    except Exception as e:
+                        log.debug(f"[Diagnostics] Could not parse a numeric value: {e}")
                         return None
 
                 def _clamp(v: float, lo: float, hi: float) -> float:
                     try:
                         return max(lo, min(hi, float(v)))
-                    except Exception:
+                    except Exception as e:
+                        log.debug(f"[Diagnostics] Could not clamp {v!r}: {e}")
                         return float(lo)
 
                 # Category: Monitor Auto-Resume Timeout (AUTO_RESUME_TRIGGERED)
@@ -738,8 +742,8 @@ class MessageHandler:
                                 thresh_ms = int(round(thresh_v * (1000.0 if thresh_u == "s" else 1.0)))
                             if isinstance(force_ms, (int, float)) and force_ms is not None:
                                 recommended_ms = int(_clamp(max(float(force_ms) + 250.0, 500.0), 1.0, 2000.0))
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            log.debug(f"[Diagnostics] Could not derive a threshold recommendation: {e}")
 
                     recommended_s = (float(recommended_ms) / 1000.0) if isinstance(recommended_ms, int) else None
                     code_out = "BASE_SKIN_VERIFY_FAILED" if ("verification failed" in ml) else "BASE_SKIN_FORCE_SLOW"
@@ -790,6 +794,7 @@ class MessageHandler:
             out.reverse()
             return out
         except Exception:
+            log.warning("[Diagnostics] Could not compute diagnostics errors", exc_info=True)
             return []
     
     def _handle_path_validate(self, payload: dict) -> None:
@@ -848,7 +853,8 @@ class MessageHandler:
             target_skin_ids = self._get_entry_target_skin_ids(entry)
             try:
                 relative_path = entry.path.relative_to(self.mod_storage.mods_root)
-            except Exception:
+            except Exception as e:
+                log.debug(f"[CustomMods] Mod path outside the mods root, using absolute path: {e}")
                 relative_path = entry.path
 
             thumbnail_relative_path = None
@@ -927,6 +933,7 @@ class MessageHandler:
         try:
             requested_skin_id = int(skin_id)
         except (TypeError, ValueError):
+            log.debug(f"[CustomMods] Ignoring invalid skin id {skin_id!r}")
             return set()
 
         compatible_ids = {requested_skin_id}
@@ -947,16 +954,17 @@ class MessageHandler:
                 try:
                     value = int(value)
                 except (TypeError, ValueError):
+                    log.debug(f"[CustomMods] Ignoring invalid target skin id {value!r}")
                     continue
                 if value > 0:
                     normalized.add(value)
-        except (AttributeError, TypeError):
-            pass
+        except (AttributeError, TypeError) as e:
+            log.debug(f"[CustomMods] Mod entry has unreadable target_skin_ids: {e}")
         if not normalized:
             try:
                 normalized.add(int(entry.skin_id))
-            except (AttributeError, TypeError, ValueError):
-                pass
+            except (AttributeError, TypeError, ValueError) as e:
+                log.debug(f"[CustomMods] Mod entry has no usable skin id: {e}")
         return normalized
 
     @staticmethod
@@ -971,7 +979,8 @@ class MessageHandler:
 
         try:
             relative_path = entry.path.relative_to(self.mod_storage.mods_root)
-        except (ValueError, AttributeError):
+        except (ValueError, AttributeError) as e:
+            log.debug(f"[CustomMods] Mod path outside the mods root, using absolute path: {e}")
             relative_path = entry.path
 
         relative_value = self._normalize_mod_identifier(str(relative_path))
@@ -1003,7 +1012,8 @@ class MessageHandler:
         if selected_mod is not None:
             try:
                 relative_path = selected_mod.path.relative_to(self.mod_storage.mods_root)
-            except (ValueError, AttributeError):
+            except (ValueError, AttributeError) as e:
+                log.debug(f"[CustomMods] Selected mod outside the mods root, using absolute path: {e}")
                 relative_path = selected_mod.path
             result.update(
                 {
@@ -1175,6 +1185,7 @@ class MessageHandler:
             champion_id = int(champion_id)
             skin_id = int(skin_id)
         except (TypeError, ValueError):
+            log.debug(f"[SkinMonitor] Non-numeric mod selection ids: championId={champion_id!r}, skinId={skin_id!r}")
             champion_id = None
             skin_id = None
 
@@ -1204,7 +1215,8 @@ class MessageHandler:
                         for value in selected_custom_mod.get("target_skin_ids", ())
                         if int(value) > 0
                     }
-                except (TypeError, ValueError):
+                except (TypeError, ValueError) as e:
+                    log.debug(f"[SkinMonitor] Selected custom mod has invalid target_skin_ids: {e}")
                     selected_target_skin_ids = set()
             selected_matches_skin = bool(
                 selected_custom_mod
@@ -2235,7 +2247,7 @@ class MessageHandler:
         """Send response message to clients"""
         try:
             running_loop = asyncio.get_running_loop()
-        except RuntimeError:
+        except RuntimeError:  # silent-ok: no running loop is the normal off-loop case
             running_loop = None
         
         if running_loop is self.websocket_server.loop:
@@ -2351,7 +2363,7 @@ class MessageHandler:
                     if champ_id_int < 1000 and "skin" not in champ_name.lower():
                         champions_dict[champ_id_int] = {"id": champ_id_int, "name": champ_name}
                 except (ValueError, TypeError):
-                    pass
+                    log.debug(f"[CustomMods] Ignoring non-numeric champion id {champ_id!r}")
             
             # Recursively search in all values
             for value in data.values():
@@ -2519,7 +2531,8 @@ class MessageHandler:
                                         self.skin_scraper.get_chromas_for_skin(int(skin_id))
                                         or []
                                     )
-                                except (AttributeError, TypeError, ValueError):
+                                except (AttributeError, TypeError, ValueError) as e:
+                                    log.debug(f"[CustomMods] No chromas for skin {skin_id!r}: {e}")
                                     raw_chromas = []
 
                             for chroma in raw_chromas:
@@ -2546,7 +2559,8 @@ class MessageHandler:
                                 if chroma_tile_path:
                                     chroma_entry["tilePath"] = chroma_tile_path
                                 skins.append(chroma_entry)
-                        except (ValueError, TypeError, AttributeError):
+                        except (ValueError, TypeError, AttributeError) as e:
+                            log.debug(f"[CustomMods] Skipping unreadable skin entry: {e}")
                             continue
                 
                 # Sort base skins and chromas together by their real target ID.

@@ -5,10 +5,13 @@ Utility helpers for creating simple Win32 windows using ctypes.
 from __future__ import annotations
 
 import ctypes
+import logging
 import queue
 import threading
 from ctypes import wintypes
 from typing import Callable, Dict, Optional
+
+log = logging.getLogger(__name__)
 
 user32 = ctypes.windll.user32
 gdi32 = ctypes.windll.gdi32
@@ -516,12 +519,12 @@ class Win32Window:
         while True:
             try:
                 action = self._pending_actions.get_nowait()
-            except queue.Empty:
+            except queue.Empty:  # silent-ok: queue drained
                 break
             try:
                 action()
-            except Exception:
-                pass
+            except Exception as exc:
+                log.warning(f"[UI] Pending window action failed: {exc}", exc_info=True)
 
     def set_window_styles(self, hwnd: wintypes.HWND, add: int = 0, remove: int = 0) -> None:
         if not hwnd:
@@ -588,7 +591,7 @@ class Win32Window:
             try:
                 if handle_value:
                     user32.DestroyIcon(wintypes.HICON(handle_value))
-            except Exception:
+            except Exception:  # silent-ok: icon already destroyed
                 pass
         self._icon_handles.clear()
 

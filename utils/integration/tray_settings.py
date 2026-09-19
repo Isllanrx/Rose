@@ -14,7 +14,7 @@ from typing import Optional
 
 try:
     from PIL import Image  # type: ignore
-except ImportError:  # pragma: no cover - optional dependency
+except ImportError:  # pragma: no cover - optional dependency  # silent-ok: optional dependency; the feature degrades without it
     Image = None  # type: ignore
 
 from config import get_config_float, get_config_option, set_config_option
@@ -134,7 +134,7 @@ class InjectionSettingsWindow(Win32Window):
             pos = self.send_message(self.trackbar_hwnd, TBM_GETPOS, 0, 0)
         try:
             pos_int = int(pos)
-        except (TypeError, ValueError):
+        except (TypeError, ValueError):  # silent-ok: trackbar returned no position; nothing to update
             return
         self.current_threshold = max(0.0, min(2.0, pos_int / 100.0))
         if self.value_label_hwnd:
@@ -201,7 +201,8 @@ class InjectionSettingsWindow(Win32Window):
                 return False
             league_exe = game_dir / "League of Legends.exe"
             return league_exe.exists() and league_exe.is_file()
-        except Exception:
+        except Exception as exc:
+            log.debug(f"[Settings] Could not validate the game path: {exc}")
             return False
 
     def _update_path_status(self, path: str = None) -> None:
@@ -417,7 +418,7 @@ class InjectionSettingsWindow(Win32Window):
         if self._icon_temp_path:
             try:
                 os.remove(self._icon_temp_path)
-            except OSError:
+            except OSError:  # silent-ok: temp icon cleanup is best-effort
                 pass
             self._icon_temp_path = None
         user32.PostQuitMessage(0)

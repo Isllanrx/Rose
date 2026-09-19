@@ -116,7 +116,8 @@ class LCUAPI:
             except (ValueError, requests.exceptions.JSONDecodeError) as e:
                 log.debug(f"Failed to decode JSON response: {e}")
                 return _store(None)
-        except requests.exceptions.RequestException:
+        except requests.exceptions.RequestException as exc:
+            log.debug(f"[LCU] GET {path} failed, refreshing the connection and retrying: {exc}")
             self.connection.refresh_if_needed(force=True)
             if not self.connection.ok:
                 return None
@@ -127,9 +128,11 @@ class LCUAPI:
                 r.raise_for_status()
                 try:
                     return _store(r.json())
-                except Exception:
+                except Exception as exc:
+                    log.debug(f"[LCU] GET {path} returned a non-JSON body: {exc}")
                     return _store(None)
-            except requests.exceptions.RequestException:
+            except requests.exceptions.RequestException as exc:
+                log.debug(f"[LCU] GET {path} failed after retry: {exc}")
                 return None
     
     def put(self, path: str, json_data, timeout: float, headers: Optional[dict] = None) -> Optional[requests.Response]:
@@ -212,7 +215,7 @@ class LCUAPI:
             dt_ms = (time.perf_counter() - t0) * 1000.0
             try:
                 log.debug(f"[LCU] PATCH {path} -> {getattr(resp, 'status_code', 'None')} in {dt_ms:.1f}ms")
-            except Exception:
+            except Exception:  # silent-ok: timing log only; the request result is returned
                 pass
             return resp
         except requests.exceptions.RequestException:
@@ -229,9 +232,10 @@ class LCUAPI:
                 dt_ms = (time.perf_counter() - t0) * 1000.0
                 try:
                     log.debug(f"[LCU] PATCH(retry) {path} -> {getattr(resp, 'status_code', 'None')} in {dt_ms:.1f}ms")
-                except Exception:
+                except Exception:  # silent-ok: timing log only; the request result is returned
                     pass
                 return resp
-            except requests.exceptions.RequestException:
+            except requests.exceptions.RequestException as exc:
+                log.debug(f"[LCU] PATCH {path} failed after retry: {exc}")
                 return None
 

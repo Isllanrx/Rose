@@ -241,7 +241,7 @@ class InjectionManager:
                             details={"skin": skin_name, "skin_id": skin_id, "champion_id": champion_id},
                         )
                         return False
-            except (ValueError, IndexError):
+            except (ValueError, IndexError):  # silent-ok: non-numeric names take the regular injection path
                 pass  # Not a numeric skin ID, continue with normal injection
 
         self._ensure_initialized()

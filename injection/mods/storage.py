@@ -216,7 +216,7 @@ class ModStorageService:
             return ()
         try:
             values = iter(value)
-        except TypeError:
+        except TypeError:  # silent-ok: non-iterable target list means no targets
             return ()
 
         normalized = set()
@@ -224,6 +224,7 @@ class ModStorageService:
             try:
                 skin_id = int(raw_value)
             except (TypeError, ValueError):
+                log.debug(f"[CustomMods] Ignoring invalid target skin id {raw_value!r}")
                 continue
             if skin_id > 0:
                 normalized.add(skin_id)
@@ -239,7 +240,8 @@ class ModStorageService:
             manifest_path = champion_dir / metadata_name
             try:
                 payload = json.loads(manifest_path.read_text(encoding="utf-8"))
-            except (OSError, TypeError, ValueError, json.JSONDecodeError):
+            except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
+                log.debug(f"[CustomMods] Skipping unreadable manifest {manifest_path}: {exc}")
                 continue
             if isinstance(payload, dict):
                 break
@@ -273,7 +275,8 @@ class ModStorageService:
                 (path for path in mod_path.rglob("*") if path.is_file()),
                 key=lambda path: path.relative_to(mod_path).as_posix().casefold(),
             )
-        except OSError:
+        except OSError as exc:
+            log.warning(f"[CustomMods] Could not list files of {mod_path}: {exc}")
             files = []
 
         for file_path in files:
@@ -290,7 +293,8 @@ class ModStorageService:
                 folder_hash.update(b"\0")
                 if relative_path.casefold().endswith((".wad", ".wad.client")):
                     wad_hashes[relative_path] = file_hash.hexdigest()
-            except (OSError, ValueError):
+            except (OSError, ValueError) as exc:
+                log.debug(f"[CustomMods] Could not hash a file in {mod_path}: {exc}")
                 continue
         return folder_hash.hexdigest(), wad_hashes
 
@@ -454,7 +458,8 @@ class ModStorageService:
         manifest_path = self.mods_root / category / self.CATEGORY_METADATA
         try:
             payload = json.loads(manifest_path.read_text(encoding="utf-8"))
-        except (OSError, TypeError, ValueError, json.JSONDecodeError):
+        except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
+            log.debug(f"[CustomMods] No readable category manifest at {manifest_path}: {exc}")
             return set()
         if not isinstance(payload, dict):
             return set()
@@ -515,7 +520,8 @@ class ModStorageService:
             manifest_path = category_dir / self.CATEGORY_METADATA
             try:
                 payload = json.loads(manifest_path.read_text(encoding="utf-8"))
-            except (OSError, TypeError, ValueError, json.JSONDecodeError):
+            except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
+                log.debug(f"[CustomMods] No readable category manifest at {manifest_path}, starting a new one: {exc}")
                 payload = {}
             if not isinstance(payload, dict):
                 payload = {}
@@ -566,7 +572,7 @@ class ModStorageService:
 
             try:
                 updated_at = candidate.stat().st_mtime
-            except OSError:
+            except OSError:  # silent-ok: mtime is only a sort key
                 updated_at = 0.0
 
             target_skin_ids = self._get_manifest_targets_for_mod(
@@ -635,7 +641,8 @@ class ModStorageService:
         # directories for the restored manual import flow.
         try:
             legacy_directories = sorted(self.skins_dir.iterdir(), key=lambda p: p.name.lower())
-        except OSError:
+        except OSError as exc:
+            log.debug(f"[CustomMods] Legacy skins folder unavailable: {exc}")
             legacy_directories = []
         for child in legacy_directories:
             if not child.is_dir() or child == champion_directory:
@@ -692,12 +699,13 @@ class ModStorageService:
             
             try:
                 updated_at = candidate.stat().st_mtime
-            except OSError:
+            except OSError:  # silent-ok: mtime is only a sort key
                 updated_at = 0.0
             
             try:
                 relative_path = candidate.relative_to(self.mods_root)
-            except Exception:
+            except Exception as exc:
+                log.debug(f"[CustomMods] Mod outside the mods root, using absolute path: {exc}")
                 relative_path = candidate
             
             entries.append({
@@ -714,7 +722,7 @@ class ModStorageService:
     def _to_int(value: int | str) -> Optional[int]:
         try:
             return int(value)
-        except (TypeError, ValueError):
+        except (TypeError, ValueError):  # silent-ok: callers treat None as not a number
             return None
 
     @staticmethod

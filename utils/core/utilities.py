@@ -247,7 +247,7 @@ def find_free_port(start_port: int = 50000, max_attempts: int = 100) -> Optional
                 # Port is free, return it
                 log.debug(f"[UTILITIES] Found free port: {port}")
                 return port
-        except OSError:
+        except OSError:  # silent-ok: port in use; the next one is tried
             # Port is in use, try next one
             continue
     

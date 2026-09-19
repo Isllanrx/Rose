@@ -20,7 +20,7 @@ log = get_logger()
 
 try:
     from .relay_config import RELAY_URL as _CONFIGURED_URL
-except ImportError:
+except ImportError:  # silent-ok: relay config is optional; the default URL is used
     _CONFIGURED_URL = ""
 
 RELAY_URL = os.environ.get("ROSE_RELAY_URL", _CONFIGURED_URL)
@@ -108,7 +108,7 @@ class PartyRelay:
                 task.cancel()
                 try:
                     await task
-                except asyncio.CancelledError:
+                except asyncio.CancelledError:  # silent-ok: cancellation is the normal shutdown path
                     pass
 
         self._ping_task = None
@@ -118,8 +118,8 @@ class PartyRelay:
             try:
                 await self._ws.send(json.dumps({"type": "leave"}))
                 await self._ws.close()
-            except Exception:
-                pass
+            except Exception as exc:
+                log.debug(f"[RELAY] Leave/close during disconnect failed: {exc}")
             self._ws = None
 
         self.members = []
@@ -129,7 +129,8 @@ class PartyRelay:
         if self._ws and self._connected:
             try:
                 await self._ws.send(json.dumps(data))
-            except ConnectionClosed:
+            except ConnectionClosed as exc:
+                log.debug(f"[RELAY] Connection closed while sending: {exc}")
                 self._connected = False
 
     async def _receive_loop(self):
@@ -140,7 +141,8 @@ class PartyRelay:
                         continue
                     try:
                         msg = json.loads(message)
-                    except json.JSONDecodeError:
+                    except json.JSONDecodeError as exc:
+                        log.debug(f"[RELAY] Ignoring non-JSON relay message: {exc}")
                         continue
 
                     if msg.get("type") == "members":
@@ -154,7 +156,7 @@ class PartyRelay:
         except ConnectionClosed:
             log.info("[RELAY] Connection closed")
             self._connected = False
-        except asyncio.CancelledError:
+        except asyncio.CancelledError:  # silent-ok: cancellation is the normal shutdown path
             return
         except Exception as e:
             log.warning(f"[RELAY] Receive error: {e}")
@@ -167,7 +169,8 @@ class PartyRelay:
                 if self._ws and self._connected:
                     try:
                         await self._ws.send("ping")
-                    except Exception:
+                    except Exception as exc:
+                        log.debug(f"[RELAY] Keepalive failed, stopping: {exc}")
                         break
-        except asyncio.CancelledError:
+        except asyncio.CancelledError:  # silent-ok: cancellation is the normal shutdown path
             return

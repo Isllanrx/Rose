@@ -129,7 +129,7 @@ class UDPTransport:
             self._receive_task.cancel()
             try:
                 await self._receive_task
-            except asyncio.CancelledError:
+            except asyncio.CancelledError:  # silent-ok: cancellation is the normal shutdown path
                 pass
             self._receive_task = None
 
@@ -233,7 +233,7 @@ class UDPTransport:
 
         try:
             await asyncio.wait_for(success_event.wait(), timeout=timeout)
-        except asyncio.TimeoutError:
+        except asyncio.TimeoutError:  # silent-ok: no reply before the timeout is the expected failure; the caller checks success
             pass
 
         # Cancel all tasks
@@ -292,10 +292,10 @@ class UDPTransport:
 
                     # Not from expected peer, put back
                     await self._pending_receives.put((data, recv_addr))
-                except asyncio.TimeoutError:
+                except asyncio.TimeoutError:  # silent-ok: receive timeout; the punch loop retries
                     continue
 
-        except asyncio.CancelledError:
+        except asyncio.CancelledError:  # silent-ok: cancellation is the normal shutdown path
             return
 
     async def _receive_loop(self):
@@ -330,7 +330,7 @@ class UDPTransport:
                     # Queue for recv() calls (e.g. hole punch initiator waiting for reply)
                     await self._pending_receives.put((data, addr))
 
-            except asyncio.CancelledError:
+            except asyncio.CancelledError:  # silent-ok: cancellation is the normal shutdown path
                 break
             except Exception as e:
                 if self._running:

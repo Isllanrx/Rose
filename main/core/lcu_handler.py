@@ -62,23 +62,23 @@ def create_lcu_disconnection_handler(state: SharedState, skin_scraper: LCUSkinSc
         # Clear collection state safely
         try:
             state.locks_by_cell.clear()
-        except Exception:
+        except Exception:  # silent-ok: replaces a container that has no clear()
             state.locks_by_cell = {}
         try:
             state.processed_action_ids.clear()
-        except Exception:
+        except Exception:  # silent-ok: replaces a container that has no clear()
             state.processed_action_ids = set()
         try:
             state.owned_skin_ids.clear()
-        except Exception:
+        except Exception:  # silent-ok: replaces a container that has no clear()
             state.owned_skin_ids = set()
         try:
             state.swiftplay_skin_tracking.clear()
-        except Exception:
+        except Exception:  # silent-ok: replaces a container that has no clear()
             state.swiftplay_skin_tracking = {}
         try:
             state.swiftplay_extracted_mods.clear()
-        except Exception:
+        except Exception:  # silent-ok: replaces a container that has no clear()
             state.swiftplay_extracted_mods = []
 
         # Reset UI detection thread cache/connection

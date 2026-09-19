@@ -20,7 +20,12 @@ Nunca propor correção antes de a causa raiz estar provada por log + código.
    - Comparar com outras partidas do mesmo patch: se só a skin X crasha, a causa é o `.fantome` dessa skin, não o Rose.
 5. Rose não ativa o Pengu com `WinError 4551`: Smart App Control bloqueou binário sem assinatura (CodeIntegrity eventos 3033/3077).
 6. Plugin JS não reage numa tela do cliente (ex.: Rift Clássico): não chutar seletores. Criar plugin de diagnóstico só leitura em `%LOCALAPPDATA%\Rose\Pengu Loader\plugins\<Nome>\index.js` que envia `{type: "chroma-log", source, message, data}` pelo `window.__roseBridge`; o resumo do DOM aparece no `rose_*.log`. Remover após o diagnóstico.
-7. Validar dados do jogo com a API local: LCU (`lockfile` → `/lol-game-data/assets/v1/...`, `/lol-champions/v1/inventories/...`) e Live Client Data (`https://127.0.0.1:2999/liveclientdata/allgamedata`) — sempre só leitura.
+7. `Final name variable: 'None'`: procurar na mesma sessão as linhas de diagnóstico (desde a branch `diag/jade-skin-selection`):
+   `Skin '.*' ignored|Discarding skin title|No skin to inject at threshold|Failed to handle LCU event|Session view`.
+   Título antes do lock = corrida (o JS não reenvia título igual); `Failed to handle LCU event` = exceção que antes era engolida.
+8. Dúvida sobre o comportamento de uma tela do cliente: ler o código real em `<League>\Plugins\<rcp-fe-*>\assets.wad` com `WadReader` (`entry_hashes()` + `read_hash()`, filtrar por conteúdo) antes de propor CSS/DOM. Ex.: no Clássico a navegação depende de `session.allowSkinSelection` e `skin-selector-info` reposiciona o carrossel.
+9. Reproduzir ao vivo sem mexer no Rose: `.claude/tasks/active/classico-diag-tools/` tem `lcu_monitor.py` (só assina eventos do LCU, horário em ms) e `diagjade_plugin.js` (título/cliques do carrossel do Clássico no `rose_*.log`). Instalar o plugin **depois** que o Rose abre. O WebSocket do LCU não entrega `skin-selector-info`; o reposicionamento do carrossel só aparece pelo DOM. Carrossel voltando à skin padrão no GAME_STARTING é visual e ocorre após o limiar.
+10. Validar dados do jogo com a API local: LCU (`lockfile` → `/lol-game-data/assets/v1/...`, `/lol-champions/v1/inventories/...`) e Live Client Data (`https://127.0.0.1:2999/liveclientdata/allgamedata`) — sempre só leitura.
 
 ## Fase 2 — Classificar cada ERROR
 Para cada ERROR responda: é causa ou consequência? O que aconteceu imediatamente antes (±5 linhas)?
@@ -32,6 +37,8 @@ Falsos positivos conhecidos:
 | `Pengu command failed ... League Client UX is not running` no CLEANUP | Cliente fechado/em jogo; restart impossível, esperado. |
 | `WinError 10061` logo após `Requested the League Client UX to restart` | Porta LCU fechada durante restart do cliente. |
 | `LCU lockfile is not ready` por horas | Cliente do League não aberto. |
+| Print/relato de um usuário sem sessão correspondente no log local | O cliente local estava ocioso (`GameflowMonitor: marking None/afk` no `LeagueClient.log`); o caso é da máquina do usuário. Pedir o log dele. |
+| Logs sumiram | O Rose apaga logs com mais de 24h no start; a desinstalação apaga `%LOCALAPPDATA%\Rose`. |
 
 ## Fase 3 — Rastrear no código
 - Localize a mensagem exata com Grep (`glob: *.py`) e leia só o trecho relevante.

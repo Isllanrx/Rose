@@ -115,7 +115,7 @@ def _get_desktop_user_info() -> Tuple[Optional[str], Optional[str]]:
         finally:
             kernel32.CloseHandle(process_handle)
 
-    except Exception:
+    except Exception:  # silent-ok: desktop user lookup is optional; runs before logging is configured
         return None, None
 
 
@@ -170,7 +170,7 @@ def get_user_data_dir() -> Path:
                     # Ensure the directory exists with proper permissions
                     try:
                         _cached_user_data_dir.mkdir(parents=True, exist_ok=True)
-                    except (OSError, PermissionError):
+                    except (OSError, PermissionError):  # silent-ok: directory is created later when needed; runs before logging is configured
                         pass  # Will be created later when needed
                     return _cached_user_data_dir
 
@@ -316,7 +316,7 @@ def get_asset_path(asset_name: str) -> Path:
     asset_path = assets_dir / candidate
     try:
         asset_path.resolve(strict=False).relative_to(assets_dir.resolve(strict=False))
-    except (OSError, ValueError):
+    except (OSError, ValueError):  # silent-ok: path outside assets is rejected as an invalid asset
         return invalid_asset
 
     return asset_path
@@ -333,7 +333,7 @@ def ensure_write_permissions(path: Path) -> bool:
         test_file.touch()
         test_file.unlink()
         return True
-    except (OSError, PermissionError):
+    except (OSError, PermissionError):  # silent-ok: the caller reports missing write permission
         return False
 
 

@@ -75,14 +75,14 @@ class LockFile:
                     try:
                         import psutil
                         return not psutil.pid_exists(old_pid)
-                    except ImportError:
+                    except ImportError:  # silent-ok: psutil missing, falls back to OpenProcess
                         # Fallback for Windows
                         try:
                             ctypes.windll.kernel32.OpenProcess(0x1000, False, old_pid)
                             return False  # Process exists
-                        except OSError:
+                        except OSError:  # silent-ok: OpenProcess failure means the old process is gone
                             return True  # Process doesn't exist
-        except (IOError, ValueError):
+        except (IOError, ValueError):  # silent-ok: unreadable lock is treated as stale; runs before logging is configured
             return True  # Assume stale if can't read
         return False
 

@@ -119,7 +119,7 @@ def champion_alias_from_library(champion_dir: Path) -> str:
     for archive in archives:
         try:
             return champion_alias_from_mod_archive(archive)
-        except ClassicSkinError as e:
+        except ClassicSkinError as e:  # silent-ok: collected in errors and raised by the caller
             errors.append(str(e))
     detail = f" ({errors[0]})" if errors else ""
     raise ClassicSkinError(f"no usable skin archive for champion folder {champion_dir.name}{detail}")
@@ -138,8 +138,8 @@ def load_jade_characters(hashes_path: Path, cache_path: Path) -> frozenset[str]:
         cached = json.loads(cache_path.read_text(encoding="utf-8"))
         if cached.get("source") == fingerprint:
             return frozenset(cached["characters"])
-    except (OSError, ValueError, KeyError, TypeError, AttributeError):
-        pass
+    except (OSError, ValueError, KeyError, TypeError, AttributeError) as exc:
+        log.debug(f"[CLASSIC] Character cache unusable, rebuilding: {exc}")
 
     characters: set[str] = set()
     try:

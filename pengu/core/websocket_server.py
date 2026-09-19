@@ -112,7 +112,7 @@ class WebSocketServer:
                 asyncio.run_coroutine_threadsafe(
                     self._signal_shutdown(), self._loop
                 )
-            except RuntimeError:
+            except RuntimeError:  # silent-ok: loop already closed during shutdown
                 pass
     
     async def _signal_shutdown(self) -> None:

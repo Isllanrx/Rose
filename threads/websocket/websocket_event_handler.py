@@ -58,14 +58,25 @@ class WebSocketEventHandler:
         """Handle incoming WebSocket message"""
         try:
             data = json.loads(msg)
-            if isinstance(data, list) and len(data) >= 3:
-                if data[0] == 8 and isinstance(data[2], dict):
-                    self.handle_api_event(data[2])
-                return
-            if isinstance(data, dict) and "uri" in data:
-                self.handle_api_event(data)
+        except (TypeError, ValueError) as e:
+            log.debug(f"[WS] Ignoring non-JSON LCU message: {e}")
+            return
+
+        payload = None
+        if isinstance(data, list) and len(data) >= 3:
+            if data[0] == 8 and isinstance(data[2], dict):
+                payload = data[2]
+        elif isinstance(data, dict) and "uri" in data:
+            payload = data
+        if payload is None:
+            return
+
+        try:
+            self.handle_api_event(payload)
         except Exception:
-            pass
+            # A failure here drops lock detection and the loadout timer for this event,
+            # so the traceback is what makes a missing injection diagnosable.
+            log.exception(f"[WS] Failed to handle LCU event {payload.get('uri')}")
     
     def handle_api_event(self, payload: dict):
         """Handle API event from WebSocket"""
@@ -99,8 +110,8 @@ class WebSocketEventHandler:
             if prev_phase == "ChampSelect" and ph != "ChampSelect":
                 try:
                     _on_champ_select_exit()
-                except Exception:
-                    pass
+                except Exception as e:
+                    log.debug(f"[WS] Base skin tracker exit hook failed: {e}")
             
             if ph == "ChampSelect":
                 # Detect game mode FIRST to get accurate is_swiftplay_mode flag
@@ -197,7 +208,8 @@ class WebSocketEventHandler:
         self.state.reset_skin_notification = True
         try:
             self.state.processed_action_ids.clear()
-        except Exception:
+        except Exception as e:
+            log.debug(f"[WS] processed_action_ids was not a set ({e}); replacing it")
             self.state.processed_action_ids = set()
         
         # Request UI initialization when entering ChampSelect
@@ -251,6 +263,7 @@ class WebSocketEventHandler:
         try:
             cid = int(cid) if cid is not None else None
         except Exception:
+            log.debug(f"[WS] Ignoring invalid hovered champion id {cid!r}")
             cid = None
         
         if cid and cid != self.state.hovered_champ_id:
@@ -275,8 +288,8 @@ class WebSocketEventHandler:
                         # Check if this confirms a pending base skin force
                         try:
                             _on_skin_confirmed(skin_int)
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            log.debug(f"[WS] Base skin tracker confirmation hook failed: {e}")
                     break
         
         # Visible players (distinct cellIds)

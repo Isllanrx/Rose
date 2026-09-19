@@ -22,7 +22,7 @@ from typing import List, Optional, Callable
 try:
     import psutil
     PSUTIL_AVAILABLE = True
-except ImportError:
+except ImportError:  # silent-ok: optional dependency; PSUTIL_AVAILABLE gates every use
     PSUTIL_AVAILABLE = False
     psutil = None
 
@@ -83,9 +83,9 @@ class OverlayManager:
                 try:
                     if path.is_file():
                         total += path.stat().st_size
-                except OSError:
+                except OSError:  # silent-ok: size is informational only
                     continue
-        except OSError:
+        except OSError:  # silent-ok: size is informational only
             return 0
         return total
 
@@ -342,7 +342,8 @@ class OverlayManager:
                     proc.terminate()
                     try:
                         proc.wait(timeout=PROCESS_TERMINATE_TIMEOUT_S)
-                    except subprocess.TimeoutExpired:
+                    except subprocess.TimeoutExpired as exc:
+                        log.debug(f"[INJECT] mkoverlay did not terminate in time, killing it: {exc}")
                         proc.kill()
                         proc.wait()
                     if self.process_manager:

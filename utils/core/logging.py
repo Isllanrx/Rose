@@ -86,9 +86,9 @@ class SizeRotatingCompositeHandler(logging.Handler):
             for flt in getattr(self, 'filters', []) or []:
                 try:
                     self.current_handler.addFilter(flt)
-                except Exception:
+                except Exception:  # silent-ok: logging infrastructure must never raise and has nowhere to report
                     pass
-        except Exception:
+        except Exception:  # silent-ok: logging infrastructure must never raise and has nowhere to report
             pass
 
     def _maybe_rotate(self):
@@ -97,13 +97,13 @@ class SizeRotatingCompositeHandler(logging.Handler):
             if current_size >= self.max_bytes:
                 try:
                     self.current_handler.close()
-                except Exception:
+                except Exception:  # silent-ok: logging infrastructure must never raise and has nowhere to report
                     pass
                 self._index += 1
                 self.current_path = self._compute_current_path()
                 self.current_handler = self.create_handler_fn(self.current_path)
                 self._apply_stored_config()
-        except Exception:
+        except Exception:  # silent-ok: logging infrastructure must never raise and has nowhere to report
             # Never break logging due to rotation errors
             pass
 
@@ -111,7 +111,7 @@ class SizeRotatingCompositeHandler(logging.Handler):
         try:
             self._maybe_rotate()
             self.current_handler.emit(record)
-        except Exception:
+        except Exception:  # silent-ok: logging infrastructure must never raise and has nowhere to report
             # Swallow any errors to avoid crashing the app due to logging
             pass
 
@@ -119,41 +119,41 @@ class SizeRotatingCompositeHandler(logging.Handler):
         self._stored_formatter = fmt
         try:
             self.current_handler.setFormatter(fmt)
-        except Exception:
+        except Exception:  # silent-ok: logging infrastructure must never raise and has nowhere to report
             pass
         try:
             super().setFormatter(fmt)
-        except Exception:
+        except Exception:  # silent-ok: logging infrastructure must never raise and has nowhere to report
             pass
 
     def setLevel(self, level):
         try:
             super().setLevel(level)
-        except Exception:
+        except Exception:  # silent-ok: logging infrastructure must never raise and has nowhere to report
             pass
         try:
             self.current_handler.setLevel(level)
-        except Exception:
+        except Exception:  # silent-ok: logging infrastructure must never raise and has nowhere to report
             pass
 
     def addFilter(self, filter):
         try:
             super().addFilter(filter)
-        except Exception:
+        except Exception:  # silent-ok: logging infrastructure must never raise and has nowhere to report
             pass
         try:
             self.current_handler.addFilter(filter)
-        except Exception:
+        except Exception:  # silent-ok: logging infrastructure must never raise and has nowhere to report
             pass
 
     def close(self):
         try:
             self.current_handler.close()
-        except Exception:
+        except Exception:  # silent-ok: logging infrastructure must never raise and has nowhere to report
             pass
         try:
             super().close()
-        except Exception:
+        except Exception:  # silent-ok: logging infrastructure must never raise and has nowhere to report
             pass
 
 def setup_logging(log_mode: str = 'customer', *, write_logs: bool = True):
@@ -171,13 +171,13 @@ def setup_logging(log_mode: str = 'customer', *, write_logs: bool = True):
     if sys.stdout is not None and not hasattr(sys.stdout, 'name') or sys.stdout.name != os.devnull:
         try:
             sys.stdout.reconfigure(line_buffering=True)
-        except (AttributeError, OSError):
+        except (AttributeError, OSError):  # silent-ok: console stream is optional; file logging is unaffected
             pass  # stdout doesn't support reconfigure or is redirected
     
     if sys.stderr is not None and not hasattr(sys.stderr, 'name') or sys.stderr.name != os.devnull:
         try:
             sys.stderr.reconfigure(line_buffering=True)
-        except (AttributeError, OSError):
+        except (AttributeError, OSError):  # silent-ok: console stream is optional; file logging is unaffected
             pass  # stderr doesn't support reconfigure or is redirected
     
     # Create a queue-based non-blocking logging handler
@@ -203,12 +203,12 @@ def setup_logging(log_mode: str = 'customer', *, write_logs: bool = True):
                         # Emit to target handler in worker thread
                         try:
                             self.target_handler.emit(record)
-                        except Exception:
+                        except Exception:  # silent-ok: logging infrastructure must never raise and has nowhere to report
                             # If emit fails, silently drop the log message
                             pass
                         finally:
                             self.queue.task_done()
-                    except queue.Empty:
+                    except queue.Empty:  # silent-ok: logging infrastructure must never raise and has nowhere to report
                         continue
             
             self.worker_thread = threading.Thread(target=worker, daemon=True, name="LogQueueWorker")
@@ -219,7 +219,7 @@ def setup_logging(log_mode: str = 'customer', *, write_logs: bool = True):
             try:
                 # Use put_nowait to never block the calling thread
                 self.queue.put_nowait(record)
-            except queue.Full:
+            except queue.Full:  # silent-ok: logging infrastructure must never raise and has nowhere to report
                 # Queue is full - drop the message silently
                 # This prevents blocking even under extreme log load
                 pass
@@ -229,7 +229,7 @@ def setup_logging(log_mode: str = 'customer', *, write_logs: bool = True):
             self._stop_event.set()
             try:
                 self.queue.put_nowait(None)  # Sentinel to stop worker
-            except queue.Full:
+            except queue.Full:  # silent-ok: logging infrastructure must never raise and has nowhere to report
                 pass
             if self.worker_thread and self.worker_thread.is_alive():
                 self.worker_thread.join(timeout=1.0)
@@ -255,10 +255,10 @@ def setup_logging(log_mode: str = 'customer', *, write_logs: bool = True):
                 try:
                     stream.write(msg + self.terminator)
                     stream.flush()
-                except (BlockingIOError, BrokenPipeError, OSError):
+                except (BlockingIOError, BrokenPipeError, OSError):  # silent-ok: logging infrastructure must never raise and has nowhere to report
                     # Stream is blocking or broken - skip this message
                     pass
-            except (AttributeError, OSError, ValueError):
+            except (AttributeError, OSError, ValueError):  # silent-ok: logging infrastructure must never raise and has nowhere to report
                 # If the stream is broken, silently ignore
                 pass
     
@@ -397,7 +397,7 @@ def setup_logging(log_mode: str = 'customer', *, write_logs: bool = True):
                     if log_file:
                         logger.debug(f"Log file location: {log_file.absolute()}")
                     
-        except (AttributeError, OSError):
+        except (AttributeError, OSError):  # silent-ok: console stream is optional; file logging is unaffected
             pass  # stdout is broken, ignore
     
     # Suppress HTTPS/HTTP logs
@@ -535,7 +535,7 @@ def cleanup_logs():
                 mtime = log_file.stat().st_mtime
                 if now - mtime > max_age_seconds:
                     log_file.unlink()
-            except Exception:
+            except Exception:  # silent-ok: runs before logging is configured
                 pass
 
     except Exception as e:
@@ -556,7 +556,7 @@ def _clear_log_file(log_file: Path):
                 if backup_file.is_file():
                     backup_file.unlink()
                     
-    except Exception:
+    except Exception:  # silent-ok: runs before logging is configured
         # Silently ignore cleanup errors
         pass
 

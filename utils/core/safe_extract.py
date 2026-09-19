@@ -49,7 +49,7 @@ def is_safe_path(base_dir: Path, target_path: Path) -> bool:
 
         # Compare path components: a string prefix check would accept sibling folders such as "skins-evil"
         return target_resolved.is_relative_to(base_resolved)
-    except (OSError, ValueError):
+    except (OSError, ValueError):  # silent-ok: unresolvable path is treated as unsafe and rejected
         return False
 
 

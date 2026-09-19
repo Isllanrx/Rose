@@ -161,8 +161,8 @@ class SwiftplayHandler:
                 if hasattr(ui_thread, "stop_event") and getattr(ui_thread, "stop_event"):
                     try:
                         ui_thread.stop_event.clear()
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        log.debug(f"[Swiftplay] Could not clear the UI stop event: {exc}")
             
             log.info(f"[phase] Swiftplay lobby - Game mode: {game_mode}, Map ID: {map_id}")
             
@@ -347,14 +347,14 @@ class SwiftplayHandler:
 
                 try:
                     self.state.swiftplay_skin_tracking.clear()
-                except Exception:
+                except Exception:  # silent-ok: replaces a container that has no clear()
                     self.state.swiftplay_skin_tracking = {}
 
                 # Always clear extracted mods on cleanup - if cleanup is called, the
                 # Swiftplay session is over and any leftover mods are orphaned.
                 try:
                     self.state.swiftplay_extracted_mods.clear()
-                except Exception:
+                except Exception:  # silent-ok: replaces a container that has no clear()
                     self.state.swiftplay_extracted_mods = []
 
                 # Reset UI-related shared state
@@ -391,8 +391,8 @@ class SwiftplayHandler:
                     if hasattr(ui_thread, "stop_event"):
                         try:
                             ui_thread.stop_event.clear()
-                        except Exception:
-                            pass
+                        except Exception as exc:
+                            log.debug(f"[Swiftplay] Could not clear the UI stop event: {exc}")
                     if hasattr(ui_thread, "_injection_disconnect_active"):
                         ui_thread._injection_disconnect_active = False
                     if hasattr(ui_thread, "_last_phase"):

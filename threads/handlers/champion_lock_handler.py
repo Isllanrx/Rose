@@ -40,7 +40,8 @@ class ChampionLockHandler:
         self.injection_manager = injection_manager
         self.skin_scraper = skin_scraper
         self.last_locked_champion_id: Optional[int] = None
-    
+        self._last_lock_view = None
+
     def handle_session_locks(self, sess: dict):
         """Handle champion locks from session data"""
         if getattr(self.state, "reset_last_locked", False):
@@ -52,7 +53,13 @@ class ChampionLockHandler:
         curr_cells = set(new_locks.keys())
         added = sorted(list(curr_cells - prev_cells))
         removed = sorted(list(prev_cells - curr_cells))
-        
+
+        # Session events arrive many times per second; log only when our view changes.
+        lock_view = (self.state.local_cell_id, tuple(sorted(new_locks.items())))
+        if lock_view != self._last_lock_view:
+            self._last_lock_view = lock_view
+            log.debug(f"[lock:champ] Session view: local_cell={lock_view[0]}, locks={dict(lock_view[1])}")
+
         # Check for champion exchanges in existing locks
         if self.state.local_cell_id is not None:
             my_cell_id = int(self.state.local_cell_id)
@@ -146,9 +153,9 @@ class ChampionLockHandler:
             self.state.historic_mode_active = False
             self.state.historic_skin_id = None
             self.state.historic_first_detection_done = False
-        except Exception:
-            pass
-        
+        except Exception as e:
+            log.warning(f"[exchange] Failed to reset historic mode state: {e}")
+
         # Clear cache
         if self.state.ui_skin_thread:
             try:
@@ -182,8 +189,8 @@ class ChampionLockHandler:
             ui = get_user_interface(self.state, self.skin_scraper)
             if ui:
                 ui._try_show_click_blocker()
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug(f"[exchange] Failed to show click blocker: {e}")
         
         log.info(f"[exchange] Champion exchange complete - ready for {new_champ_label}")
     
@@ -221,6 +228,12 @@ class ChampionLockHandler:
             
             # Clear cache
             if self.state.ui_skin_thread:
+                dropped_title = getattr(self.state, "ui_last_text", None)
+                if dropped_title and self.state.last_hovered_skin_id is None:
+                    log.warning(
+                        f"[lock:champ] Discarding skin title '{dropped_title}' received before the lock; "
+                        "it is only resent if the carousel changes"
+                    )
                 try:
                     self.state.ui_skin_thread.clear_cache()
                 except Exception as e:

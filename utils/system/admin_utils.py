@@ -151,7 +151,7 @@ def register_autostart():
         else:
             return False, f"Failed to register: {result.stderr}"
     
-    except Exception as e:
+    except Exception as e:  # silent-ok: error returned to the caller, which reports it
         return False, f"Failed to register auto-start: {e}"
 
 
@@ -190,7 +190,7 @@ def unregister_autostart():
         else:
             return False, f"Failed to unregister: {result.stderr}"
     
-    except Exception as e:
+    except Exception as e:  # silent-ok: error returned to the caller, which reports it
         return False, f"Failed to unregister auto-start: {e}"
 
 

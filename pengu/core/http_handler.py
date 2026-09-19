@@ -48,14 +48,14 @@ class HTTPHandler:
             target_resolved = requested_path.resolve()
             target_resolved.relative_to(base_dir.resolve())
             return True
-        except (OSError, ValueError):
+        except (OSError, ValueError):  # silent-ok: unresolvable path is treated as unsafe and rejected
             return False
 
     def _get_origin(self, request_headers: dict) -> Optional[str]:
         """Read Origin from a dict-like headers object."""
         try:
             return request_headers.get("Origin") or request_headers.get("origin")
-        except AttributeError:
+        except AttributeError:  # silent-ok: headers object without get() has no Origin
             return None
 
     def _forbidden(self) -> tuple:

@@ -1,0 +1,77 @@
+14:32:17.709 DISCONNECTED {"error": "[WinError 10061] Nenhuma conexão pôde ser feita porque a máquina de destino as recusou ativamente"}
+14:32:21.744 DISCONNECTED {"error": "[WinError 10061] Nenhuma conexão pôde ser feita porque a máquina de destino as recusou ativamente"}
+14:32:24.264 CONNECTED {"port": "58420"}
+14:32:49.564 GAMEFLOW-PHASE {"eventType": "Update", "data": "Lobby"}
+14:33:01.522 GAMEFLOW-PHASE {"eventType": "Update", "data": "Matchmaking"}
+14:33:01.526 GAMEFLOW-PHASE {"eventType": "Update", "data": "ReadyCheck"}
+14:33:01.596 SESSION {"phase": "PLANNING", "left_ms": 24000, "allowSkinSelection": true, "cell": 0, "myPick": {"champ": 0, "completed": false, "inProgress": false}, "champ": 0, "selectedSkinId": 0, "players": 2}
+14:33:01.601 GAMEFLOW-PHASE {"eventType": "Update", "data": "ChampSelect"}
+14:33:03.296 SESSION {"phase": "PLANNING", "left_ms": 22295, "allowSkinSelection": true, "cell": 0, "myPick": {"champ": 60103, "completed": false, "inProgress": false}, "champ": 0, "selectedSkinId": 0, "players": 2}
+14:33:25.583 SESSION {"phase": "BAN_PICK", "left_ms": 30000, "allowSkinSelection": true, "cell": 0, "myPick": {"champ": 60103, "completed": false, "inProgress": false}, "champ": 0, "selectedSkinId": 0, "players": 2}
+14:33:50.832 SESSION {"phase": "BAN_PICK", "left_ms": 36400, "allowSkinSelection": true, "cell": 0, "myPick": {"champ": 0, "completed": false, "inProgress": false}, "champ": 0, "selectedSkinId": 0, "players": 2}
+14:33:57.240 SESSION {"phase": "BAN_PICK", "left_ms": 36400, "allowSkinSelection": true, "cell": 0, "myPick": {"champ": 0, "completed": false, "inProgress": true}, "champ": 0, "selectedSkinId": 0, "players": 2}
+14:33:59.848 SESSION {"phase": "BAN_PICK", "left_ms": 27384, "allowSkinSelection": true, "cell": 0, "myPick": {"champ": 60084, "completed": false, "inProgress": true}, "champ": 0, "selectedSkinId": 0, "players": 2}
+14:34:00.335 SESSION {"phase": "BAN_PICK", "left_ms": 26902, "allowSkinSelection": true, "cell": 0, "myPick": {"champ": 60012, "completed": false, "inProgress": true}, "champ": 0, "selectedSkinId": 0, "players": 2}
+14:34:00.823 SESSION {"phase": "BAN_PICK", "left_ms": 26409, "allowSkinSelection": true, "cell": 0, "myPick": {"champ": 60063, "completed": false, "inProgress": true}, "champ": 0, "selectedSkinId": 0, "players": 2}
+14:34:01.397 SESSION {"phase": "BAN_PICK", "left_ms": 25835, "allowSkinSelection": true, "cell": 0, "myPick": {"champ": 60022, "completed": false, "inProgress": true}, "champ": 0, "selectedSkinId": 0, "players": 2}
+14:34:01.928 SESSION {"phase": "BAN_PICK", "left_ms": 25305, "allowSkinSelection": true, "cell": 0, "myPick": {"champ": 60001, "completed": false, "inProgress": true}, "champ": 0, "selectedSkinId": 0, "players": 2}
+14:34:02.861 SESSION {"phase": "BAN_PICK", "left_ms": 24378, "allowSkinSelection": true, "cell": 0, "myPick": {"champ": 60074, "completed": false, "inProgress": true}, "champ": 0, "selectedSkinId": 0, "players": 2}
+14:34:04.581 SESSION {"phase": "BAN_PICK", "left_ms": 22660, "allowSkinSelection": true, "cell": 0, "myPick": {"champ": 60099, "completed": false, "inProgress": true}, "champ": 0, "selectedSkinId": 0, "players": 2}
+14:34:08.250 SESSION {"phase": "BAN_PICK", "left_ms": 19452, "allowSkinSelection": true, "cell": 0, "myPick": {"champ": 60044, "completed": false, "inProgress": true}, "champ": 0, "selectedSkinId": 0, "players": 2}
+14:34:08.251 SESSION {"phase": "BAN_PICK", "left_ms": 19226, "allowSkinSelection": true, "cell": 0, "myPick": {"champ": 60017, "completed": false, "inProgress": true}, "champ": 0, "selectedSkinId": 0, "players": 2}
+14:34:08.253 SESSION {"phase": "BAN_PICK", "left_ms": 18977, "allowSkinSelection": true, "cell": 0, "myPick": {"champ": 60019, "completed": false, "inProgress": true}, "champ": 0, "selectedSkinId": 0, "players": 2}
+14:34:16.911 SESSION {"phase": "BAN_PICK", "left_ms": 10318, "allowSkinSelection": true, "cell": 0, "myPick": {"champ": 60055, "completed": false, "inProgress": true}, "champ": 0, "selectedSkinId": 0, "players": 2}
+14:34:17.708 SESSION {"phase": "BAN_PICK", "left_ms": 30000, "allowSkinSelection": true, "cell": 0, "myPick": {"champ": 60055, "completed": true, "inProgress": false}, "champ": 60055, "selectedSkinId": 60055301, "players": 2}
+14:34:23.086 SESSION {"phase": "FINALIZATION", "left_ms": 30000, "allowSkinSelection": true, "cell": 0, "myPick": {"champ": 60055, "completed": true, "inProgress": false}, "champ": 60055, "selectedSkinId": 60055301, "players": 2}
+14:34:53.096 SESSION {"phase": "GAME_STARTING", "left_ms": 0, "allowSkinSelection": true, "cell": 0, "myPick": {"champ": 60055, "completed": true, "inProgress": false}, "champ": 60055, "selectedSkinId": 60055301, "players": 2}
+14:34:54.261 GAMEFLOW-PHASE {"eventType": "Update", "data": "GameStart"}
+14:34:54.389 GAMEFLOW-PHASE {"eventType": "Update", "data": "InProgress"}
+14:34:54.412 SESSION {"phase": "", "left_ms": 0, "allowSkinSelection": true, "cell": -1, "myPick": null, "champ": null, "selectedSkinId": null, "players": 0}
+14:38:08.564 GAMEFLOW-PHASE {"eventType": "Update", "data": "Reconnect"}
+14:38:23.167 GAMEFLOW-PHASE {"eventType": "Update", "data": "TerminatedInError"}
+14:38:23.168 GAMEFLOW-PHASE {"eventType": "Update", "data": "None"}
+14:38:23.273 GAMEFLOW-PHASE {"eventType": "Update", "data": "TerminatedInError"}
+14:38:23.275 GAMEFLOW-PHASE {"eventType": "Update", "data": "None"}
+14:38:32.037 GAMEFLOW-PHASE {"eventType": "Update", "data": "Lobby"}
+14:38:54.681 GAMEFLOW-PHASE {"eventType": "Update", "data": "Matchmaking"}
+14:38:54.684 GAMEFLOW-PHASE {"eventType": "Update", "data": "ReadyCheck"}
+14:38:54.772 SESSION {"phase": "PLANNING", "left_ms": 24000, "allowSkinSelection": true, "cell": 0, "myPick": {"champ": 0, "completed": false, "inProgress": false}, "champ": 0, "selectedSkinId": 0, "players": 2}
+14:38:54.776 GAMEFLOW-PHASE {"eventType": "Update", "data": "ChampSelect"}
+14:39:00.354 SESSION {"phase": "PLANNING", "left_ms": 18329, "allowSkinSelection": true, "cell": 0, "myPick": {"champ": 60090, "completed": false, "inProgress": false}, "champ": 0, "selectedSkinId": 0, "players": 2}
+14:39:18.686 SESSION {"phase": "BAN_PICK", "left_ms": 30000, "allowSkinSelection": true, "cell": 0, "myPick": {"champ": 60090, "completed": false, "inProgress": false}, "champ": 0, "selectedSkinId": 0, "players": 2}
+14:39:34.015 SESSION {"phase": "BAN_PICK", "left_ms": 36400, "allowSkinSelection": true, "cell": 0, "myPick": {"champ": 60090, "completed": false, "inProgress": true}, "champ": 0, "selectedSkinId": 0, "players": 2}
+14:39:38.029 SESSION {"phase": "BAN_PICK", "left_ms": 25967, "allowSkinSelection": true, "cell": 0, "myPick": {"champ": 60063, "completed": false, "inProgress": true}, "champ": 0, "selectedSkinId": 0, "players": 2}
+14:39:38.731 SESSION {"phase": "BAN_PICK", "left_ms": 25259, "allowSkinSelection": true, "cell": 0, "myPick": {"champ": 60031, "completed": false, "inProgress": true}, "champ": 0, "selectedSkinId": 0, "players": 2}
+14:39:44.635 SESSION {"phase": "BAN_PICK", "left_ms": 19353, "allowSkinSelection": true, "cell": 0, "myPick": {"champ": 60090, "completed": false, "inProgress": true}, "champ": 0, "selectedSkinId": 0, "players": 2}
+14:39:45.446 SESSION {"phase": "BAN_PICK", "left_ms": 30000, "allowSkinSelection": true, "cell": 0, "myPick": {"champ": 60090, "completed": true, "inProgress": false}, "champ": 60090, "selectedSkinId": 60090000, "players": 2}
+14:39:47.574 SESSION {"phase": "FINALIZATION", "left_ms": 30000, "allowSkinSelection": true, "cell": 0, "myPick": {"champ": 60090, "completed": true, "inProgress": false}, "champ": 60090, "selectedSkinId": 60090000, "players": 2}
+14:40:17.564 SESSION {"phase": "GAME_STARTING", "left_ms": 0, "allowSkinSelection": true, "cell": 0, "myPick": {"champ": 60090, "completed": true, "inProgress": false}, "champ": 60090, "selectedSkinId": 60090000, "players": 2}
+14:40:18.587 GAMEFLOW-PHASE {"eventType": "Update", "data": "GameStart"}
+14:40:18.794 GAMEFLOW-PHASE {"eventType": "Update", "data": "InProgress"}
+14:40:18.823 SESSION {"phase": "", "left_ms": 0, "allowSkinSelection": true, "cell": -1, "myPick": null, "champ": null, "selectedSkinId": null, "players": 0}
+14:41:59.479 GAMEFLOW-PHASE {"eventType": "Update", "data": "Reconnect"}
+14:42:26.046 GAMEFLOW-PHASE {"eventType": "Update", "data": "TerminatedInError"}
+14:42:26.048 GAMEFLOW-PHASE {"eventType": "Update", "data": "None"}
+14:42:26.149 GAMEFLOW-PHASE {"eventType": "Update", "data": "TerminatedInError"}
+14:42:26.152 GAMEFLOW-PHASE {"eventType": "Update", "data": "None"}
+14:42:36.787 GAMEFLOW-PHASE {"eventType": "Update", "data": "Lobby"}
+14:42:42.645 GAMEFLOW-PHASE {"eventType": "Update", "data": "Matchmaking"}
+14:42:42.648 GAMEFLOW-PHASE {"eventType": "Update", "data": "ReadyCheck"}
+14:42:42.692 SESSION {"phase": "PLANNING", "left_ms": 24000, "allowSkinSelection": true, "cell": 0, "myPick": {"champ": 0, "completed": false, "inProgress": false}, "champ": 0, "selectedSkinId": 0, "players": 2}
+14:42:42.695 GAMEFLOW-PHASE {"eventType": "Update", "data": "ChampSelect"}
+14:42:43.786 SESSION {"phase": "PLANNING", "left_ms": 22876, "allowSkinSelection": true, "cell": 0, "myPick": {"champ": 60084, "completed": false, "inProgress": false}, "champ": 0, "selectedSkinId": 0, "players": 2}
+14:43:06.666 SESSION {"phase": "BAN_PICK", "left_ms": 30000, "allowSkinSelection": true, "cell": 0, "myPick": {"champ": 60084, "completed": false, "inProgress": false}, "champ": 0, "selectedSkinId": 0, "players": 2}
+14:43:20.008 SESSION {"phase": "BAN_PICK", "left_ms": 36400, "allowSkinSelection": true, "cell": 0, "myPick": {"champ": 60084, "completed": false, "inProgress": true}, "champ": 0, "selectedSkinId": 0, "players": 2}
+14:43:26.351 SESSION {"phase": "BAN_PICK", "left_ms": 23621, "allowSkinSelection": true, "cell": 0, "myPick": {"champ": 60034, "completed": false, "inProgress": true}, "champ": 0, "selectedSkinId": 0, "players": 2}
+14:43:30.862 SESSION {"phase": "BAN_PICK", "left_ms": 19119, "allowSkinSelection": true, "cell": 0, "myPick": {"champ": 60081, "completed": false, "inProgress": true}, "champ": 0, "selectedSkinId": 0, "players": 2}
+14:43:32.205 SESSION {"phase": "BAN_PICK", "left_ms": 30000, "allowSkinSelection": true, "cell": 0, "myPick": {"champ": 60081, "completed": true, "inProgress": false}, "champ": 60081, "selectedSkinId": 60081301, "players": 2}
+14:43:34.387 SESSION {"phase": "FINALIZATION", "left_ms": 30000, "allowSkinSelection": true, "cell": 0, "myPick": {"champ": 60081, "completed": true, "inProgress": false}, "champ": 60081, "selectedSkinId": 60081301, "players": 2}
+14:44:04.389 SESSION {"phase": "GAME_STARTING", "left_ms": 0, "allowSkinSelection": true, "cell": 0, "myPick": {"champ": 60081, "completed": true, "inProgress": false}, "champ": 60081, "selectedSkinId": 60081301, "players": 2}
+14:44:05.767 GAMEFLOW-PHASE {"eventType": "Update", "data": "GameStart"}
+14:44:05.878 GAMEFLOW-PHASE {"eventType": "Update", "data": "InProgress"}
+14:44:05.909 SESSION {"phase": "", "left_ms": 0, "allowSkinSelection": true, "cell": -1, "myPick": null, "champ": null, "selectedSkinId": null, "players": 0}
+14:44:47.839 GAMEFLOW-PHASE {"eventType": "Update", "data": "Reconnect"}
+14:45:11.531 GAMEFLOW-PHASE {"eventType": "Update", "data": "TerminatedInError"}
+14:45:11.533 GAMEFLOW-PHASE {"eventType": "Update", "data": "None"}
+14:45:11.622 GAMEFLOW-PHASE {"eventType": "Update", "data": "TerminatedInError"}
+14:45:11.625 GAMEFLOW-PHASE {"eventType": "Update", "data": "None"}
