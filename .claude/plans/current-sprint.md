@@ -1,101 +1,106 @@
 ---
 updated: 2026-09-19
-sprint: 2026-09-19 — Consolidação em dev + otimização de memória
+sprint: 2026-09-19 — Hardening etapa 3 validado + otimização de memória
 ---
 
 # Sprint atual
 
-## Fluxo de branches (definido em 2026-09-19)
+## Fluxo de branches (confirmado pelo usuário em 2026-09-19)
 
 ```
-correção → branch própria → validação → merge em dev → (depois) main
+nova correção → branch própria → validação → merge em dev
+dev (pré-validada) → main, quando tudo passar na dev
 ```
 
-- **`main`** — espelha o layout do repositório upstream do Rose. Só código-fonte.
-  Nada de `.claude/`, `test/` (além de `test_pengu_loader.py`, que já era rastreado
-  upstream) ou `testes_Pesados/`. É a branch de onde sai o PR.
-- **`dev`** — branch de integração, carrega todo o ferramental local.
-- `dev` → `main` **não é prioridade agora** e quando acontecer precisa ser
-  **seletiva** (cherry-pick dos commits de fonte), nunca merge inteiro, senão o
-  ferramental vaza para a `main`.
+- **Toda correção nasce em branch própria** (`fix/*`, `perf/*`). Nunca commitar
+  correção direto em `dev` ou `main`.
+- **`dev`** é a área pré-validada: só recebe o que já passou.
+- **`main`** recebe a `dev` inteira quando tudo estiver validado. `main` precisa
+  respeitar o layout do repositório upstream do Rose para o PR ser aceitável.
 
-Por isso o `.gitignore` é **idêntico nas duas branches** e continua excluindo
-`.claude/`, `/test/` e `testes_Pesados/`; na `dev` eles entraram com `git add -f`.
-Arquivo **novo** dentro dessas pastas precisa de `-f` para ser rastreado.
+### Conflito em aberto neste fluxo
 
-## Estado: `dev` em `021ceace`, `main` intacta em `45b24701`
+A `dev` carrega `.claude/`, `test/` e `testes_Pesados/` **commitados** (`655af3b5`).
+Se a `dev` inteira for para a `main`, esse ferramental vai junto e a `main` deixa de
+respeitar o layout upstream. As duas regras não cabem ao mesmo tempo.
+
+Opções, com a recomendação primeiro:
+
+1. **Mover o ferramental para uma branch `tooling` própria**, deixando a `dev` só com
+   código-fonte. Aí `dev` → `main` vira merge limpo e o fluxo funciona como descrito.
+   Exige reescrever a história local da `dev` (ela não foi publicada, então é seguro).
+2. Promoção seletiva (cherry-pick dos commits de fonte). Funciona, mas contraria o
+   "a dev inteira vai pra main".
+3. Aceitar o ferramental na `main` e não abrir PR upstream.
+
+**Decisão do usuário pendente.**
+
+## Estado
 
 ```
-021ceace merge(dev): stream the hash table download
- ├ 893565af test(hashes): pin the streamed output to the previous merge
- └ 92df2f25 perf(hashes): stream the hash table instead of merging it in memory
-655af3b5 chore(dev): track project context, tests and heavy suites
-7326b284 chore(gitignore): ignore local tooling and scratch directories
-938bcad5 merge(dev): prod hardening stage 3 after heavy-suite validation
- ├ 09c515e9 fix(monitor): never leave the game suspended or the monitor duplicated
- ├ 392beec9 fix(swiftplay): release the suspended game on every exit path
- └ e51154a4 fix(pengu): bound the CLI call so cleanup cannot hang forever
-45b24701 ← main
+dev   c9ac7383   (11 commits à frente)
+main  45b24701   intacta, igual a origin/main
 ```
 
-Branches `fix/prod-hardening` e `perf/hashes-memory` foram apagadas após o merge.
+Branches `fix/prod-hardening` e `perf/hashes-memory` apagadas após o merge.
 Backup do working tree original: `%TEMP%\rose-backup\working-tree-20260919-090408.patch`.
 
-## Hardening etapa 3 — commitado
+## Validação sistemática de 2026-09-19 — passou
 
-| Item | O que mudou | Validação |
-|---|---|---|
-| #12 Pengu CLI trava o shutdown | `timeout=15s` + `except TimeoutExpired` (herda de `SubprocessError`, não de `OSError`) | 2 falhas → OK |
-| #10 Swiftplay deixa o jogo suspenso | `try/finally` com `_stop_monitor()` | 2 falhas → OK |
-| #9 GameMonitor | `stop()` resume fora da guarda `_monitor_active`; `start()` faz `join(3s)` e recusa segunda thread; `RLock` no `_suspended_game_process` | 3 falhas → OK |
+| Verificação | Resultado |
+|---|---|
+| Estado git (output bruto) | `dev` 11 commits à frente, `main` intacta, working tree limpo |
+| Compilação de todo o código | OK |
+| Import dos 10 módulos críticos | OK |
+| Suíte unitária | **116 OK**, 3 skipped |
+| Suíte pesada | **14 testes, 12 OK**, 2 skipped |
+| Diferencial hardening contra `45b24701` | **7 falhas no antigo → 0 no novo** |
+| Diferencial memória (`tracemalloc`, entrada real de 231 MB) | **692 MB → 2,1 MB** de pico alocado |
+| Identidade da saída do streaming | SHA-256 igual em 230.694.084 bytes |
+| Resíduos | nenhum `.tmp`; `hashes.game.txt` intacto |
 
-Descartado do working tree: um diff em `classic_skin_builder.py` que removia uma
-linha em branco entre funções de topo (quebra E302 do PEP 8, sem relação com as
-correções).
+### Armadilhas descobertas durante a validação
 
-### Decisão pendente do usuário
+- **O rtk filtra o output do git.** `git log main..dev` mostrou 9 commits; o real são
+  11 (escondeu os dois merges). E `grep` sobre `git diff --cached` lê o **resumo**, não
+  o conteúdo — uma varredura de segredos feita assim não vale nada. Para validação,
+  usar `rtk proxy <cmd>`.
+- **`get_skins_dir()` cria o diretório** ao ser chamada. Isso mascara a ausência da
+  biblioteca e alterou a contagem da suíte pesada de 11 para 14 testes no meio da
+  validação (destravou um `setUpClass` que antes pulava a classe inteira).
+- **Worktree órfão** de sessão anterior com o commit `4435f694` fora da história da
+  `dev`. Conferido arquivo por arquivo: só difere em CRLF, nada perdido. Pode remover.
+
+## Concluído nesta sprint
+
+**Hardening etapa 3** — #9 `GameMonitor`, #10 Swiftplay, #12 Pengu CLI. Validado nos
+três níveis: unitário, processos reais e **in-game (Teste C passou em 2026-09-19)**.
+
+**Otimização #48** — `download_and_merge_hashes` mantinha quatro cópias da tabela de
+230 MB vivas ao mesmo tempo. Agora faz streaming direto para o arquivo, via
+`atomic_write` (`durable=False`, ADR-006). Ganho extra: parte que falha no meio do
+download não deixa mais tabela truncada.
+
+### Decisão do usuário ainda pendente
 `start()` pode retornar **sem ativar o monitor** se a thread anterior não morrer em
-3 s. Os chamadores (`manager.py:180, 316`) não checam retorno, então nesse caso o
-jogo não é suspenso e a injeção pode falhar — com WARNING no log. Preferível a duas
-threads disputando o mesmo processo, mas é trade-off consciente.
+3 s. Os chamadores (`manager.py:180, 316`) não checam retorno, então nesse caso o jogo
+não é suspenso e a injeção pode falhar — com WARNING no log. Preferível a duas threads
+disputando o mesmo processo, mas é trade-off consciente.
 
-## Otimização de memória — commitado
+## Otimização — o que falta
 
-`download_and_merge_hashes` mantinha **quatro cópias** da tabela de 230 MB vivas ao
-mesmo tempo (blobs crus + strings decodificadas + string concatenada + bytes finais).
-
-| Medição no arquivo real (230.694.084 bytes) | Antes | Depois |
+| # | Item | Estado |
 |---|---|---|
-| Pico de RSS acima da base | **+923 MB** | **+0 MB** |
-| SHA-256 da saída | `319c36d2…` | `319c36d2…` (idêntico) |
+| ~~48~~ | Pico de ~940 MB no download da tabela de hashes | **feito** |
+| 45 | Índice de hashes dos WADs, 1× por patch em background | **próximo** — medido: 392 WADs / 31,5 GB → 898.520 entradas, 5,00 s, 7 MB em disco |
+| 13 | `mkoverlay` no cache frio (97,63 s vs 4,20 s) | bloqueado pelo #45 |
+| 44 | Classificador de compatibilidade de mods | bloqueado pelo #45 |
+| 26 | Sync de skins incremental (GitHub compare em vez do ZIP inteiro) | não iniciado |
+| 27 | `TIMER_HZ` 1000 → 20–60 Hz | **não é gargalo** — medido 1,6% de um core, e o loop entrega ~650 Hz, não 1000 |
 
-Ganho extra: escrita via `atomic_write` (`durable=False`, ADR-006) — uma parte que
-falha no meio do download não deixa tabela truncada; o arquivo anterior permanece.
+Detalhe do #45 e o critério para camada nativa: ver as notas no fim do `backlog.md`.
 
-Cobertura: `test/test_hashes_streaming.py`, 9 testes / 576 combinações de fragmentos
-comparadas contra o algoritmo antigo, em 7 tamanhos de chunk.
-
-## Base de validação
-- `.venv\Scripts\python -m unittest discover -s test` → **116 OK** (3 skipped)
-- `.venv\Scripts\python testes_Pesados\run_all.py` → **11 OK**, veredito `APTO`
-
-## Teste C — passou (2026-09-19)
-
-Com skin injetada e partida em andamento, fechar o Rose pela barra de tarefas deixa
-o jogo rodando normalmente, sem crash. Era o último pendente da validação in-game e
-cobre justamente o caminho que a etapa 3 alterou (#9, #10, #12), conforme ADR-007.
-
-**Consequência:** a etapa 3 do hardening está validada de ponta a ponta — suíte
-unitária, suíte pesada com processos reais e in-game. Não há mais bloqueio técnico
-para os commits `e51154a4`, `392beec9` e `09c515e9` seguirem para a `main` quando o
-PR entrar na pauta.
-
-## Pendente
-- Próxima etapa da otimização: **#45**, índice binário persistente (`mmap` + `u64`
-  ordenado + `bisect`) para substituir a varredura linear de 6,65 s da tabela de
-  hashes. É o que destrava #13 (mkoverlay no cache frio) e #44 (classificador de
-  compatibilidade). Decisão sobre camada nativa só **depois** desse número.
-- #11 (overlay do Swiftplay na PhaseThread, loop do `loadout_ticker` sem try externo),
-  #13, #25.
-- Registrar no backlog os oito itens de gap do Padrão 2026 (#48–#55) levantados em
-  2026-09-19.
+## Pendente antes do #45
+- **#49** sincronizar a biblioteca de skins — sem ela, 5 testes pulam e o Rift Clássico
+  fica sem cobertura.
+- **#50** trocar os 3 caminhos hardcoded com nome de usuário por `get_skins_dir()`.

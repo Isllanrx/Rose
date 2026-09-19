@@ -32,3 +32,13 @@
 - **Validação old vs new**: `git worktree add --detach <scratchpad>/old HEAD`, copiar `test/` e rodar a mesma suíte nos dois; cada teste novo deve falhar no old e passar no new.
 - **`pass` intencional** só com comentário explicando por que o erro é esperado (ex.: cache ausente em `load_jade_characters`).
 - **Pylance/mypy** acusam imports não resolvidos quando o workspace é `projeto_rose/` em vez de `Rose/` — falso positivo.
+- **O rtk filtra output**: `git log` esconde commits de merge (mostrou 9 de 11) e `git diff`
+  vem resumido, então `grep` sobre um diff **não lê o conteúdo real** — varredura de segredos
+  feita assim dá falso negativo. Para qualquer verificação que importe, usar
+  `"C:\Users\Isllan Toso\.local\bin\rtk.exe" proxy <comando>`.
+- **`get_skins_dir()` cria o diretório** ao ser chamada (`mkdir(parents=True, exist_ok=True)`).
+  Checar existência com ela mascara biblioteca ausente e muda o resultado de testes que usam
+  `skipUnless` no caminho.
+- **Escapes de barra invertida no heredoc do shell** são colapsados: `\n` vira newline real e
+  quebra o literal Python. Ao gerar código com `\n`, `\` ou `%PATH%`, escrever o arquivo com a
+  ferramenta de edição em vez de heredoc, ou montar via `chr(10)`/`chr(92)`.

@@ -14,11 +14,11 @@ Ordenado por prioridade. Checklists detalhados: skills `prod-risk-review` e `win
 | 6 | Confiança Windows — staging e `apply_update.bat` fora de `%LOCALAPPDATA%` (pasta só de admin); substituir batch (`ping`, `del "%~f0"`) por `updater.exe` assinado | segurança | EoP/TOCTOU; `updater.exe` não é distribuído |
 | 7 | Confiança Windows — executar CLI do Pengu de `{app}\_internal\Pengu Loader`, manter só `plugins`/`datastore` em AppData | segurança | Rose elevado executa exe/DLL de pasta gravável; resolve junto a upstream #208 (perfis diferentes); testar ativação nos dois modos |
 | 8 | Confiança Windows — remover atributo SYSTEM de mods/overlay; gravar `HKLM\...\Uninstall\DisplayVersion` só quando mudar; `hashes.game.txt` fora de Program Files | qualidade | Heurística comportamental / escrita em Program Files em runtime |
-| ~~9~~ | ~~`GameMonitor`: `stop()` retomar mesmo inativo, `start()` sem `join`, corrida no processo suspenso~~ | **corrigido, aguardando teste** | Pronto no working tree (**não commitado**). `stop()` resume fora da guarda `_monitor_active`; `start()` faz `join` e recusa segunda thread; `RLock` no `_suspended_game_process`. Old vs new: 3 falhas → OK |
-| ~~10~~ | ~~Hardening etapa 3 — `_stop_monitor` no Swiftplay (`try/finally`)~~ | **corrigido, aguardando teste** | Pronto no working tree (**não commitado**). Só o caminho de sucesso soltava o jogo (via `overlay_manager.py:334`); exceção e código não-zero deixavam suspenso. Old vs new: 2 falhas → OK. Nota: `inject_skin_immediately` já tinha `finally` (`manager.py:359`) — o item citava um `_inject_custom_mod` que não existe mais |
+| ~~9~~ | ~~`GameMonitor`: `stop()` retomar mesmo inativo, `start()` sem `join`, corrida no processo suspenso~~ | **corrigido e validado** | Commitado na `dev`. `stop()` resume fora da guarda `_monitor_active`; `start()` faz `join` e recusa segunda thread; `RLock` no `_suspended_game_process`. Old vs new: 3 falhas → OK |
+| ~~10~~ | ~~Hardening etapa 3 — `_stop_monitor` no Swiftplay (`try/finally`)~~ | **corrigido e validado** | Commitado na `dev`. Só o caminho de sucesso soltava o jogo (via `overlay_manager.py:334`); exceção e código não-zero deixavam suspenso. Old vs new: 2 falhas → OK. Nota: `inject_skin_immediately` já tinha `finally` (`manager.py:359`) — o item citava um `_inject_custom_mod` que não existe mais |
 | 11 | Hardening etapa 3 — tirar overlay do Swiftplay da PhaseThread; try em volta (não dentro) do loop do `loadout_ticker`; `except: pass` do `champ_thread` | bug | PhaseThread bloqueada a partida inteira |
-| ~~12~~ | ~~Timeout no Pengu CLI (`pengu_loader.py:396`) no caminho de cleanup~~ | **corrigido, aguardando teste** | Pronto no working tree (**não commitado**). `timeout=15s` + `except TimeoutExpired` (herda de `SubprocessError`, não de `OSError` — só o timeout deixaria a exceção abortar o cleanup). Old vs new: 2 falhas → OK |
-| 13 | `mkoverlay` no cache frio estoura o auto-resume: medido **97,63 s** (1ª execução) vs **4,20 s** (2ª), mesma entrada. Pré-aquecer o índice dos WADs no start ataca a causa; subir `monitor_auto_resume_timeout` (teto 180 s) só compra margem | bug | Mod não carrega e o usuário não vê erro — Auditorias 2026-09-18 §5 |
+| ~~12~~ | ~~Timeout no Pengu CLI (`pengu_loader.py:396`) no caminho de cleanup~~ | **corrigido e validado** | Commitado na `dev`. `timeout=15s` + `except TimeoutExpired` (herda de `SubprocessError`, não de `OSError` — só o timeout deixaria a exceção abortar o cleanup). Old vs new: 2 falhas → OK |
+| 13 | Depende do #45. `mkoverlay` no cache frio estoura o auto-resume: medido **97,63 s** (1ª execução) vs **4,20 s** (2ª), mesma entrada. Pré-aquecer o índice dos WADs no start ataca a causa; subir `monitor_auto_resume_timeout` (teto 180 s) só compra margem | bug | Mod não carrega e o usuário não vê erro — Auditorias 2026-09-18 §5 |
 | 13b | `runoverlay should have hooked` é emitida sem verificar se o `mkoverlay` terminou — sucesso falso no log | log | ADR-005; mesma sessão do #13 |
 | 14 | Rift Clássico: HistoricMode e dado (RandomSkin) reconhecerem a tela; limitar retries de `Rewards element not found` | feature/log | ~270 linhas por partida |
 | 15 | Rift Clássico: seleção de chroma (ChromaWheel/FormsWheel reconhecer `.skins-pane`) | feature | Dados de 1196 chromas já validados (ADR-004) |
@@ -33,7 +33,7 @@ Ordenado por prioridade. Checklists detalhados: skills `prod-risk-review` e `win
 | 24 | Decidir versionamento de `test/` (hoje ignorado; só `test_pengu_loader.py` rastreado) | chore | Decisão do usuário: manter local por ora |
 | 25 | Recusa por campeão incompatível (`injection_trigger.py:156/175`) não marca `last_hover_written`: ~300 WARNING a 1000 Hz | log/bug | Auditorias §3 #13; pode ser retry intencional — analisar timing |
 | 26 | Sync de skins: baixar só arquivos alterados via GitHub compare em vez do ZIP inteiro quando acima do limite | desempenho | Auditorias §4 |
-| 27 | `TIMER_HZ_DEFAULT` 1000 → 20–60 Hz | desempenho | Muda timing do gatilho; validar in-game |
+| 27 | `TIMER_HZ_DEFAULT` 1000 → 20–60 Hz | desempenho | **Nao e gargalo**: medido 1,6% de um core, e o loop entrega ~650 Hz, nao 1000. Motivo real e a resolucao de timer do Windows elevada para o sistema todo. Muda timing do gatilho; validar in-game |
 | 28 | Do PR #184: histórico e random isolados por modo (`scope`) | feature | Auditorias §6 |
 | 29 | Do PR #184: proteção contra seleção atrasada (gerações) na trava final | bug | Auditorias §6 |
 | 30 | Do PR #184: UI do Clássico (chroma, histórico, random) sobre o builder próprio | feature | Complementa #14–#16 |
@@ -51,6 +51,34 @@ Ordenado por prioridade. Checklists detalhados: skills `prod-risk-review` e `win
 | 42 | Upstream PR #244 (fila 490): testar e comentar a favor | upstream | Sem código nosso |
 | 43 | Upstream PR #211: ajudar a atualizar se o PR local entrar antes | upstream | Conflito em `injection_trigger.py` |
 | 44 | **Classificador de compatibilidade de mods** (`injection/compat/`): detectar link pendurado contra o jogo instalado e recusar injeção antes de suspender o jogo | feature/bug | Crash validado in-game; skill `fantome-compat-rebase` |
-| 45 | Índice de hashes dos WADs do jogo (802.652 entradas) construído 1× por patch em background, invalidado por `content-metadata.json` | desempenho | Pré-requisito do #44; resolve junto o #13 |
+| 45 | Índice de hashes dos WADs do jogo construído 1× por patch em background, invalidado por `content-metadata.json` | desempenho | **Medido 2026-09-19** no jogo instalado: 392 WADs / 31,5 GB → 898.520 entradas, construcao em **5,00 s**, pico de 9 MB, indice de **7 MB** em disco (u64 ordenado + mmap + bisect). Pré-requisito do #44; resolve junto o #13 |
 | 46 | Reparo determinístico: reconstruir alvo `_Multi_Skins_` a partir dos slots do **jogo** e reescrever a lista `linked` do PROP | feature | Cobre 108 dos 110 casos medidos; supera o gap do Hematite |
 | 47 | Aviso na UI quando um mod custom for recusado por incompatibilidade, com o alvo pendurado | UX | Hoje não existe; complementa #16 |
+| ~~48~~ | ~~Pico de ~940 MB no download da tabela de hashes~~ | **corrigido e validado** | `perf(hashes)` na `dev`. Quatro copias de 230 MB vivas ao mesmo tempo. Medido com `tracemalloc` na mesma entrada real: **692 MB → 2,1 MB** de pico alocado. Saida SHA-256 identica em 230.694.084 bytes. Ganho extra: `atomic_write`, entao parte que falha no meio nao deixa tabela truncada |
+| 49 | Biblioteca de skins vazia em `%LOCALAPPDATA%\Rose\skins`: **5 testes pulam** (3 unitarios + 2 pesados). Rift Classico e integridade da biblioteca ficam sem cobertura | teste | Descoberto na validacao de 2026-09-19. `get_skins_dir()` *cria* o diretorio ao ser chamada, o que mascara a ausencia |
+| 50 | Caminhos absolutos com nome de usuario em `test/test_classic_skins.py:467,478,493` → trocar por `get_skins_dir()` | qualidade | Era o #2b. Contido na `dev` (o arquivo nao vai para a `main`), mas quebra em qualquer outra maquina |
+| 51 | `.gitattributes` ausente com `core.autocrlf=true` → ruido de fim de linha no PR upstream | chore | Descoberto na validacao de 2026-09-19 |
+| 52 | `uv` + `pyproject.toml` como fonte unica de dependencias (hoje `requirements.txt` com 11 pins) | qualidade | Padrao 2026; mexe no build assinado |
+| 53 | Ruff como **formatter** | qualidade | Padrao 2026. Reformatar 176 arquivos destroi `git blame`: fazer em commit unico e travar em `.git-blame-ignore-revs` |
+| 54 | Separacao em camadas (dominio/aplicacao/infra/apresentacao) | refactor | Padrao 2026. Alto risco: `injection/core/manager.py` mistura regra, subprocess e estado. So depois de CI e cobertura |
+| 55 | Reduzir estado global mutavel (`SharedState`, 42 modulos) | refactor | Padrao 2026. Alto risco: mexe no timing da injecao |
+| 56 | Settings centralizado: 8 `os.environ`/`getenv` espalhados e 2 caminhos `C:\Program Files` fora do `config.py` | qualidade | Padrao 2026; baixo risco |
+| 57 | Enums e constantes para numeros magicos (offsets `60000`/`60000000`, `TIMER_HZ`, teto de 180 s, exit code 15). So 3 modulos usam `enum` hoje | qualidade | Padrao 2026; mecanico e testavel |
+| 58 | Docstrings nas APIs publicas (1.222 funcoes, 126 classes; 726 com anotacao de retorno = 59%) | qualidade | Padrao 2026; risco nulo |
+| 59 | Gate de cobertura no CI | qualidade | Padrao 2026; o #36 preve medir, nao preve minimo |
+
+## Nota sobre Pydantic (#35)
+
+Reavaliar antes de adotar: adiciona dependencia compilada a um bundle PyInstaller que ja
+sofre com falso positivo de antivirus (#4), para validar mensagens que vem do proprio plugin
+JS do projeto. `TypedDict` + validacao explicita entrega o mesmo contrato sem tocar na
+superficie do instalador. Tradeoff: perde coercao automatica e mensagens de erro prontas.
+
+## Nota sobre camada nativa (Rust/C++)
+
+Medido em 2026-09-19: o trabalho pesado ja e nativo (`mod-tools.exe`, cslol C++). O que sobrou
+em Python e orquestracao — I/O e espera, menos de 2% de um core em regime. Construir o indice
+do #45 custa 5,00 s e 9 MB em Python puro. **Criterio para reabrir:** construcao acima de 10 s
+ou consulta virando caminho quente do #44 em tempo de injecao. Se disparar, modulo pequeno e
+isolado com **fallback Python obrigatorio** — o app nunca pode depender do binario nativo para
+subir. Atencao: `.gitignore` ignora `*.pyd` e `*.c`, entao extensao nativa sumiria do commit.
