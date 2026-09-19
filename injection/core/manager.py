@@ -22,6 +22,7 @@ from .injector import SkinInjector
 from ..classic import is_classic_game_mode
 from ..game.game_monitor import GameMonitor
 from ..config.threshold_manager import ThresholdManager
+from ..compat.wad_index import default_index_path, ensure_index_built
 
 log = get_logger()
 
@@ -406,8 +407,33 @@ class InjectionManager:
                     log.info("[INJECT] Background initialization completed - injection system ready")
                 except Exception as e:
                     log.error(f"[INJECT] Background initialization failed: {e}")
+                # Runs even when initialization failed: the index only needs the game
+                # folder, and a missing index must never hold back injection.
+                self._prepare_wad_index()
 
-            threading.Thread(target=init_thread, daemon=True).start()
+            threading.Thread(target=init_thread, daemon=True, name="InjectionInit").start()
+
+    def _prepare_wad_index(self) -> None:
+        """Build the game WAD index in the background. Never fatal.
+
+        The index is what lets mod compatibility be checked without scanning tens of
+        gigabytes of WADs. Without it every caller falls back to the current path, so
+        any failure here is a warning and nothing more.
+        """
+        try:
+            injector = getattr(self, "injector", None)
+            game_dir = getattr(injector, "game_dir", None) or self.game_dir
+            if not game_dir:
+                log.debug("[WADIDX] Game folder unknown, index skipped")
+                return
+
+            started = time.monotonic()
+            if ensure_index_built(Path(game_dir), default_index_path()):
+                log.info("[WADIDX] Game index ready in %.2fs", time.monotonic() - started)
+            else:
+                log.warning("[WADIDX] Game index unavailable, compatibility checks will fall back")
+        except Exception as e:
+            log.warning("[WADIDX] Game index build failed: %s", e)
 
     @property
     def last_injected_skin(self) -> Optional[str]:

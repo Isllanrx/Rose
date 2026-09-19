@@ -40,6 +40,7 @@ _WAD_ENTRY_SIZE = 32
 _WAD_GLOB = "*.wad.client"
 
 _CONTENT_METADATA = "content-metadata.json"
+_INDEX_FILENAME = "wad_index.bin"
 
 
 @dataclass(frozen=True)
@@ -269,3 +270,27 @@ def ensure_index(game_dir: Path, index_path: Path) -> Optional[WadIndex]:
     if build_index(game_dir, index_path) is None:
         return None
     return open_index(index_path, fingerprint)
+
+
+def default_index_path() -> Path:
+    """Where the running app keeps the index: the state directory, never the game folder.
+
+    Imported lazily because get_state_dir() creates the directory, and importing this
+    module must stay free of side effects for the tests.
+    """
+    from utils.core.paths import get_state_dir
+
+    return get_state_dir() / _INDEX_FILENAME
+
+
+def ensure_index_built(game_dir: Path, index_path: Path) -> bool:
+    """Build the index if it is missing or belongs to another patch.
+
+    Returns True when a valid index is on disk. Nothing is kept open, so callers
+    that only want the index prepared do not hold an mmap for the whole session.
+    """
+    index = ensure_index(game_dir, index_path)
+    if index is None:
+        return False
+    index.close()
+    return True
