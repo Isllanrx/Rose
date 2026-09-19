@@ -285,7 +285,6 @@ hiddenimports = [
     'requests',
     'urllib3',
     'websocket',
-    'websocket_client',
     'websockets',
 
     # Rift Classic skin builder (reads game WADs)
