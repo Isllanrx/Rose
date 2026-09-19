@@ -181,15 +181,29 @@ class HashesDownloader:
 
         try:
             log.info(f"Downloading {filename}...")
-            start = writer.bytes_written
             with self.session.get(
                 url, timeout=RATE_LIMIT_REQUEST_TIMEOUT, stream=True
             ) as response:
                 response.raise_for_status()
+                expected = response.headers.get("Content-Length")
+                received = 0
                 for chunk in response.iter_content(chunk_size=_DOWNLOAD_CHUNK_BYTES):
                     if chunk:
+                        received += len(chunk)
                         writer.feed(chunk)
-            log.info(f"Downloaded {filename} ({writer.bytes_written - start} bytes)")
+
+            # A connection that closes cleanly mid-stream does not always raise. Left
+            # unchecked, a truncated table would be written and the commit SHA saved
+            # as a success, leaving injection broken until the next patch.
+            try:
+                declared = int(expected) if expected is not None else None
+            except ValueError:
+                declared = None  # malformed header: nothing to compare against
+            if declared is not None and received != declared:
+                log.error(f"{filename} is truncated: got {received} of {declared} bytes")
+                return False
+
+            log.info(f"Downloaded {filename} ({received} bytes)")
             return True
         except requests.HTTPError as e:
             if e.response is not None and e.response.status_code == 404:
@@ -233,8 +247,9 @@ class HashesDownloader:
         except _HashesDownloadFailed as e:
             log.error(f"Failed to download {e.filename}; keeping the previous hashes file")
             return False
-        except Exception as e:
-            log.error(f"Failed to download and merge hashes: {e}")
+        except Exception:
+            # Unexpected on this path, so the traceback is what makes it diagnosable.
+            log.exception("Failed to download and merge hashes")
             return False
     
     def ensure_hashes_file(self) -> bool:
@@ -248,8 +263,8 @@ class HashesDownloader:
                 log.debug("hashes.game.txt is up to date")
                 return True
                 
-        except Exception as e:
-            log.error(f"Failed to ensure hashes file: {e}")
+        except Exception:
+            log.exception("Failed to ensure hashes file")
             return False
 
 

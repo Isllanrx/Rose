@@ -86,12 +86,16 @@ def _read_wad_hashes(wad_path: Path) -> Optional[array]:
         with open(wad_path, "rb") as wad:
             header = wad.read(_WAD_TOC_OFFSET)
             if len(header) < _WAD_TOC_OFFSET or header[:2] != b"RW" or header[2] != 3:
+                log.debug("[WADIDX] %s is not a WAD v3, skipped", wad_path.name)
                 return None
             (count,) = struct.unpack_from("<I", header, _WAD_TOC_OFFSET - 4)
             if count <= 0:
                 return array("Q")
             toc = wad.read(count * _WAD_ENTRY_SIZE)
             if len(toc) < count * _WAD_ENTRY_SIZE:
+                log.warning("[WADIDX] %s has a truncated table of contents "
+                            "(%d of %d bytes), skipped",
+                            wad_path.name, len(toc), count * _WAD_ENTRY_SIZE)
                 return None
     except (OSError, struct.error) as e:
         log.debug("[WADIDX] %s unreadable: %s", wad_path.name, e)
@@ -158,9 +162,14 @@ def build_index(game_dir: Path, index_path: Path) -> Optional[IndexStats]:
 
     written = _HEADER_PADDED + len(payload) + tail + len(unique) * 8
     log.info(
-        "[WADIDX] Indexed %d entries from %d WADs (%d skipped), %.1f MB",
-        len(unique), read, skipped, written / 1e6,
+        "[WADIDX] Indexed %d entries from %d WADs (%d skipped), %.1f MB, patch %s",
+        len(unique), read, skipped, written / 1e6, fingerprint,
     )
+    if skipped:
+        # Skipped WADs mean the index is incomplete, so a later compatibility check
+        # can miss a target the game really has. Say so rather than only counting it.
+        log.warning("[WADIDX] %d of %d WADs could not be read; the index is partial",
+                    skipped, read + skipped)
     return IndexStats(entries=len(unique), wads_read=read, wads_skipped=skipped,
                       bytes_written=written)
 
@@ -242,14 +251,27 @@ def open_index(index_path: Path, expected_fingerprint: str) -> Optional[WadIndex
             raise ValueError("truncated hash block")
 
         mapping = mmap.mmap(handle.fileno(), 0, access=mmap.ACCESS_READ)
-        return WadIndex(handle, mapping, fingerprint, count, offset)
-    except (OSError, ValueError, struct.error) as e:
-        log.debug("[WADIDX] Index unavailable (%s): %s", index_path.name, e)
+        try:
+            return WadIndex(handle, mapping, fingerprint, count, offset)
+        except BaseException:
+            # A mapping left open keeps Windows from replacing the file, which would
+            # freeze the index at this patch forever without anything being logged.
+            mapping.close()
+            raise
+    except FileNotFoundError:
+        # Normal on a first run and after a patch: ensure_index builds it next.
+        log.debug("[WADIDX] No index at %s yet", index_path)
+        return None
+    except (OSError, ValueError, TypeError, struct.error) as e:
+        # Anything else means the file exists but is unusable, which is worth seeing
+        # in a default INFO log: it repeats every run until the rebuild succeeds.
+        log.warning("[WADIDX] Index at %s is unusable (%s), it will be rebuilt",
+                    index_path.name, e)
         if handle is not None:
             try:
                 handle.close()
-            except OSError:
-                pass
+            except OSError as close_error:
+                log.debug("[WADIDX] Could not close the index handle: %s", close_error)
         return None
 
 
