@@ -15,7 +15,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-EXCLUDED_DIRS = ("vendor/", "test/", "testes_Pesados/", "relay-worker/", "skin-key-worker/",
+EXCLUDED_DIRS = (".claude/", "vendor/", "test/", "testes_Pesados/", "relay-worker/", "skin-key-worker/",
                  "scripts/", "build/", "dist/")
 LOG_CALLS = {"debug", "info", "warning", "error", "exception", "critical",
              "log_event", "log_status", "log_section", "print"}
