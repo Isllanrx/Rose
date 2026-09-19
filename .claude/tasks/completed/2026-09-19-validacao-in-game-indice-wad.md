@@ -18,7 +18,7 @@ monitor filtrando `[WADIDX]`, `[COMPAT]`, `[CLASSIC]`, injeção e assinaturas d
 | `INJECTION FAILED` | 0 |
 | `ERROR` fora da corrida benigna de startup | 0 |
 | `Traceback` / `Missing data` / `Uncaught exception in thread` | 0 |
-| Skin visível em jogo | **confirmado pelo usuário** no Clássico (Annie skin 9) e na ARAM (chroma 5058) |
+| Skin visível em jogo | **confirmado pelo usuário nas 4 injeções**: Rift normal (chroma 238070), Rift Clássico (Annie skin 9) e ARAM (chroma 5058) |
 
 ## Índice de WADs (#45) em produção
 
