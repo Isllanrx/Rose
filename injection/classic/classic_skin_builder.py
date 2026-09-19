@@ -186,10 +186,34 @@ class WadReader:
     def has(self, entry_path: str) -> bool:
         return wad_path_hash(entry_path) in self._entries
 
+    def entry_hashes(self) -> tuple[int, ...]:
+        """Every path hash in the table of contents, for callers with no path list."""
+        return tuple(self._entries)
+
+    def entry_info(self, path_hash: int) -> Optional[tuple[int, int]]:
+        """(uncompressed size, entry type) of an entry, without reading it."""
+        entry = self._entries.get(path_hash)
+        return None if entry is None else (entry[2], entry[3])
+
+    @staticmethod
+    def is_readable_type(entry_type: int) -> bool:
+        """Whether read_hash can decode this entry type at all.
+
+        The game also ships chunked zstd entries (type 4) that this reader has never
+        supported; they are over half of the entries in a champion WAD, so callers
+        that walk every entry have to expect them rather than treat them as damage.
+        """
+        return entry_type in (_WAD_TYPE_RAW, _WAD_TYPE_GZIP, _WAD_TYPE_ZSTD)
+
     def read(self, entry_path: str) -> Optional[bytes]:
-        entry = self._entries.get(wad_path_hash(entry_path))
+        return self.read_hash(wad_path_hash(entry_path), entry_path)
+
+    def read_hash(self, path_hash: int, label: Optional[str] = None) -> Optional[bytes]:
+        """Read an entry by its path hash. *label* only improves error messages."""
+        entry = self._entries.get(path_hash)
         if entry is None:
             return None
+        name = label or f"{path_hash:016x}"
         offset, compressed, uncompressed, entry_type = entry
         with open(self.path, "rb") as wad:
             wad.seek(offset)
@@ -202,8 +226,8 @@ class WadReader:
             if entry_type == _WAD_TYPE_ZSTD:
                 return zstandard.ZstdDecompressor().decompress(raw, max_output_size=uncompressed)
         except (zlib.error, zstandard.ZstdError) as e:
-            raise ClassicSkinError(f"corrupted WAD entry {entry_path} in {self.path.name}") from e
-        raise ClassicSkinError(f"unsupported WAD entry type {entry_type} for {entry_path}")
+            raise ClassicSkinError(f"corrupted WAD entry {name} in {self.path.name}") from e
+        raise ClassicSkinError(f"unsupported WAD entry type {entry_type} for {name}")
 
 
 def _parse_prop_entries(data: bytes) -> tuple[int, list[tuple[int, int, bytes]]]:
