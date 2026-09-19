@@ -135,3 +135,10 @@ relay-worker/.wrangler/
 
 # Local test suites
 /test/
+testes_Pesados/
+
+# Local agent tooling (duplicates .claude/skills)
+.agents/
+
+# Scratch space
+scratchpad/
