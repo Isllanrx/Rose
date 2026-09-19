@@ -137,3 +137,28 @@ nao. Ao ligar, conferir que ele aparece no PYZ; se o import for dinamico, adicio
 
 Verificacao correta (grep no `.exe` da falso negativo): extrair `PYZ-00.pyz` do CArchive com
 `PyInstaller.archive.readers.CArchiveReader` e listar o TOC do `ZlibArchiveReader`.
+
+## #13 — hipotese do pre-aquecimento REFUTADA (medido 2026-09-19)
+
+A ideia era que construir o indice de WADs no start aqueceria o cache de disco e o
+`mkoverlay` deixaria de levar ~97 s. **Nao se sustenta.**
+
+Medido em partida real (`rose_19-09-2026_10-14-04.log`):
+
+```
+10:15:41  [WADIDX] Indexed 802652 entries from 392 WADs  (leu a TOC de TODOS os WADs)
+10:16:48  mkoverlay iniciado
+10:16:52  Game suspended - Auto-resume: 60s
+10:17:33  mkoverlay completed in 44.33s
+```
+
+Sessenta e sete segundos depois de ler as 392 TOCs, o `mkoverlay` ainda levou **44,33 s**.
+Ler cabecalho + TOC nao aquece o que ele precisa: ele le o **conteudo** dos WADs, dezenas de GB.
+
+**Consequencias:**
+- o #13 continua aberto e **nao** sai de carona no #45;
+- a margem real e estreita: 44,33 s contra 60 s de `monitor_auto_resume_timeout` (15,7 s). Disco
+  mais frio ou mais ocupado estoura, e ai o mod nao carrega **sem erro visivel** para o usuario;
+- o jogo ficou **41 s congelado** (suspend 10:16:52 -> resume 10:17:33), o que por si so e ruim de UX;
+- caminhos que sobram: subir o teto do timeout (compra margem, nao resolve), pre-aquecer lendo o
+  conteudo dos WADs relevantes ao mod (caro), ou atacar o lado do `mod-tools`.
