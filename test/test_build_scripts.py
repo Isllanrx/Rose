@@ -84,6 +84,26 @@ class FindMsbuildOrderTests(unittest.TestCase):
             self.assertEqual(pengu._find_msbuild(), [vs_msbuild])
 
 
+class PenguRestoreTests(unittest.TestCase):
+    """Restore must run in its own evaluation, or a clean checkout fails with MSB3644."""
+
+    def test_build_uses_a_separate_restore(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with (
+                patch.object(pengu, "BUILD_OUTPUT", Path(tmp) / "out"),
+                patch.object(pengu, "RUNTIME_DIR", Path(tmp) / "runtime"),
+                patch.object(pengu, "_find_msbuild", return_value=["msbuild"]),
+                patch.object(pengu.subprocess, "run", return_value=_completed(returncode=1)) as run,
+            ):
+                self.assertEqual(pengu.build_loader(), 1)
+        command = run.call_args.args[0]
+        self.assertIn("/restore", command)
+        self.assertNotIn("/t:Restore,Build", command)
+        self.assertIn("/t:Build", command)
+
+
 class PyInstallerInvocationTests(unittest.TestCase):
     def test_runs_pyinstaller_from_the_current_interpreter(self):
         with patch.object(pyi.subprocess, "run", return_value=_completed()) as run:

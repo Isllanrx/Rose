@@ -108,7 +108,11 @@ def build_loader() -> int:
     output_path = str(BUILD_OUTPUT) + os.sep
     command = msbuild + [
         str(PROJECT),
-        "/t:Restore,Build",
+        # /restore runs NuGet restore in its own evaluation before the build. "/t:Restore,Build"
+        # restores and builds in one evaluation, so on a clean checkout (no obj/) the build
+        # misses the restored .NET Framework reference assemblies and fails with MSB3644.
+        "/restore",
+        "/t:Build",
         "/m",
         "/v:minimal",
         "/p:Configuration=Release",
