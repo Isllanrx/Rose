@@ -159,3 +159,22 @@ Detalhes em `tasks/completed/2026-09-19-validacao-in-game-indice-wad.md`.
   **sem** a linha `Indexed`. É o único item da validação que ficou aberto.
 - **#28/#29**: troca na bancada da ARAM, sem cobertura de teste nem in-game.
 - **#49**: biblioteca de skins vazia mantém 5 testes pulando.
+
+---
+
+# Investigação #68 — Rift Clássico `Final name 'None'` (2026-09-19, tarde)
+
+- Branch `diag/jade-skin-selection` (a partir da `dev`), **não commitada**: só logs em 4 arquivos
+  (`websocket_event_handler`, `skin_processor`, `champion_lock_handler`, `loadout_ticker`).
+- Validação: 196 unitários OK (9 novos, 6 falham no código anterior), 14 pesados OK, logs
+  confirmados dentro do PYZ do `dist\Rose\Rose.exe`.
+- Pendente: log do testador + teste in-game com outro jogador. Detalhes em
+  `tasks/active/2026-09-19-classico-final-name-none.md`.
+- **Teste in-game 14:33–14:45 com outro jogador: bug não reproduziu** (3 rodadas: escolha cedo,
+  nos últimos 5 s, sem mexer; `Final name` sempre preenchido, skins confirmadas no jogo).
+  O "volta para default" no fim é visual (reposicionamento do carrossel no GAME_STARTING, após o
+  limiar). Próximo: log do testador com o build de diagnóstico. Novo item #71 (overlay em skin possuída no Clássico).
+- **ADR-008 aplicada no projeto inteiro** (branch `diag/jade-skin-selection`): 237 `except` sem log →
+  0 sem justificativa (~90 com log, ~147 `silent-ok`). Guarda `test/test_no_silent_exceptions.py`
+  (acusa 249 no código anterior). 199 unitários + 14 pesados OK, 59 módulos importam.
+  Merge na `dev` autorizado pelo usuário. Pendentes: #70 (log só crítico no AppData), #72 (JS).
