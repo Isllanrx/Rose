@@ -16,6 +16,28 @@ BUILD_OUTPUT = ROOT / "build" / "pengu-loader"
 RUNTIME_DIR = ROOT / "Pengu Loader"
 
 
+def _dotnet_with_sdk() -> list[str] | None:
+    """Return `dotnet msbuild` only when an SDK is installed.
+
+    A machine with just the .NET runtime also has `dotnet` on PATH, but `dotnet msbuild`
+    fails there; returning None lets the Visual Studio MSBuild be tried instead.
+    """
+    dotnet = shutil.which("dotnet")
+    if not dotnet:
+        return None
+    try:
+        result = subprocess.run(
+            [dotnet, "--list-sdks"], capture_output=True, text=True, timeout=30, check=False
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        print(f"[WARN] Could not query .NET SDKs: {exc}")
+        return None
+    if result.returncode != 0 or not result.stdout.strip():
+        print("[INFO] dotnet found without an SDK; looking for Visual Studio MSBuild")
+        return None
+    return [dotnet, "msbuild"]
+
+
 def _find_msbuild() -> list[str] | None:
     configured = os.environ.get("MSBUILD_EXE")
     if configured and Path(configured).exists():
@@ -24,6 +46,12 @@ def _find_msbuild() -> list[str] | None:
     msbuild = shutil.which("msbuild")
     if msbuild:
         return [msbuild]
+
+    # Prefer the .NET SDK over the Visual Studio MSBuild: VS Build Tools without the
+    # .NET desktop workload fails with MSB4236 (Microsoft.NET.Sdk not found).
+    dotnet = _dotnet_with_sdk()
+    if dotnet:
+        return dotnet
 
     vswhere = Path(os.environ.get("ProgramFiles(x86)", "")) / "Microsoft Visual Studio" / "Installer" / "vswhere.exe"
     if vswhere.exists():
@@ -46,10 +74,6 @@ def _find_msbuild() -> list[str] | None:
             candidate = line.strip()
             if candidate and Path(candidate).exists():
                 return [candidate]
-
-    dotnet = shutil.which("dotnet")
-    if dotnet:
-        return [dotnet, "msbuild"]
 
     return None
 
