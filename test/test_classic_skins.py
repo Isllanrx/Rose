@@ -14,6 +14,7 @@ from injection.classic import classic_skin_builder as csb
 from injection.core.injector import SkinInjector
 from injection.core.manager import InjectionManager
 from state import SharedState
+from utils.core.paths import get_user_data_dir
 
 REAL_GAME_DIR = Path(r"D:\Riot Games\League of Legends\Game")
 
@@ -464,7 +465,7 @@ class InstalledGameClassicTests(unittest.TestCase):
         self.assertEqual(wukong_chars, ["jade_wukong"])
 
     def test_prepare_accepts_ids_reported_by_classic_champ_select(self):
-        skins = Path(r"C:\Users\Isllan Toso\AppData\Local\Rose\skins")
+        skins = get_user_data_dir() / "skins"
         tools = Path(__file__).resolve().parents[1] / "dist" / "Rose" / "_internal" / "injection" / "tools"
         if not (skins / "1" / "1001").is_dir() or not (tools / "hashes.game.txt").is_file():
             self.skipTest("skin library or game hash table not available")
@@ -475,7 +476,7 @@ class InstalledGameClassicTests(unittest.TestCase):
         self.assertEqual(folder, "classic_annie_1")
 
     def test_currently_selected_owned_skin_slot_is_overridden(self):
-        skins = Path(r"C:\Users\Isllan Toso\AppData\Local\Rose\skins")
+        skins = get_user_data_dir() / "skins"
         tools = Path(__file__).resolve().parents[1] / "dist" / "Rose" / "_internal" / "injection" / "tools"
         if not (skins / "1").is_dir() or not (tools / "hashes.game.txt").is_file():
             self.skipTest("skin library or game hash table not available")
@@ -490,7 +491,7 @@ class InstalledGameClassicTests(unittest.TestCase):
         self.assertEqual(entries[0][1], csb.fnv1a_32("Characters/Jade_Annie/Skins/Skin4"))
 
     def test_classic_exclusive_chroma_without_library_archive_is_prepared(self):
-        skins = Path(r"C:\Users\Isllan Toso\AppData\Local\Rose\skins")
+        skins = get_user_data_dir() / "skins"
         tools = Path(__file__).resolve().parents[1] / "dist" / "Rose" / "_internal" / "injection" / "tools"
         if not (skins / "1").is_dir() or (skins / "1" / "1303").exists() or not (tools / "hashes.game.txt").is_file():
             self.skipTest("skin library or game hash table not available")
