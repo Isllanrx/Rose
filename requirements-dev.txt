@@ -1,0 +1,4 @@
+# Quality tooling for CI and local checks (not bundled into Rose.exe).
+# Pinned so the ratchet baseline in .github/quality-baseline.json stays comparable.
+ruff==0.16.8
+mypy==2.3.1
