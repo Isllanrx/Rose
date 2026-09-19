@@ -38,14 +38,14 @@ Opções, com a recomendação primeiro:
 ## Estado
 
 ```
-dev   c9ac7383   (11 commits à frente)
+dev   3b5180f2   (20 commits à frente)
 main  45b24701   intacta, igual a origin/main
 ```
 
 Branches `fix/prod-hardening` e `perf/hashes-memory` apagadas após o merge.
 Backup do working tree original: `%TEMP%\rose-backup\working-tree-20260919-090408.patch`.
 
-## Validação sistemática de 2026-09-19 — passou
+## Validação sistemática de 2026-09-19 — passou (rodada 1, antes do #45)
 
 | Verificação | Resultado |
 |---|---|
@@ -91,10 +91,10 @@ disputando o mesmo processo, mas é trade-off consciente.
 
 | # | Item | Estado |
 |---|---|---|
-| ~~48~~ | Pico de ~940 MB no download da tabela de hashes | **feito** |
-| 45 | Índice de hashes dos WADs, 1× por patch em background | **próximo** — medido: 392 WADs / 31,5 GB → 898.520 entradas, 5,00 s, 7 MB em disco |
-| 13 | `mkoverlay` no cache frio (97,63 s vs 4,20 s) | bloqueado pelo #45 |
-| 44 | Classificador de compatibilidade de mods | bloqueado pelo #45 |
+| ~~48~~ | Pico de ~940 MB no download da tabela de hashes | **feito** — 692 MB → 2,1 MB |
+| ~~45~~ | Índice de hashes dos WADs | **feito como módulo isolado, sem call site** — 802.652 entradas em 6,4 MB, consulta 3,6 µs vs 0,39 s da varredura linear (104×) |
+| 13 | `mkoverlay` no cache frio (97,63 s vs 4,20 s) | **viabilidade não medível agora** — exige cache frio (reboot) |
+| 44 | Classificador de compatibilidade de mods | **desbloqueado** pelo #45 |
 | 26 | Sync de skins incremental (GitHub compare em vez do ZIP inteiro) | não iniciado |
 | 27 | `TIMER_HZ` 1000 → 20–60 Hz | **não é gargalo** — medido 1,6% de um core, e o loop entrega ~650 Hz, não 1000 |
 
