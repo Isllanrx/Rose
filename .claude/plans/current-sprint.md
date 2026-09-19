@@ -79,10 +79,18 @@ comparadas contra o algoritmo antigo, em 7 tamanhos de chunk.
 - `.venv\Scripts\python -m unittest discover -s test` → **116 OK** (3 skipped)
 - `.venv\Scripts\python testes_Pesados\run_all.py` → **11 OK**, veredito `APTO`
 
+## Teste C — passou (2026-09-19)
+
+Com skin injetada e partida em andamento, fechar o Rose pela barra de tarefas deixa
+o jogo rodando normalmente, sem crash. Era o último pendente da validação in-game e
+cobre justamente o caminho que a etapa 3 alterou (#9, #10, #12), conforme ADR-007.
+
+**Consequência:** a etapa 3 do hardening está validada de ponta a ponta — suíte
+unitária, suíte pesada com processos reais e in-game. Não há mais bloqueio técnico
+para os commits `e51154a4`, `392beec9` e `09c515e9` seguirem para a `main` quando o
+PR entrar na pauta.
+
 ## Pendente
-- **Teste C** in-game: fechar o Rose pela bandeja durante a partida. Vale mais agora
-  que o #9 mudou. Build atual tem `Pengu Loader.exe` **sem assinatura** (ADR-003) —
-  substituir pelo oficial antes de testar.
 - Próxima etapa da otimização: **#45**, índice binário persistente (`mmap` + `u64`
   ordenado + `bisect`) para substituir a varredura linear de 6,65 s da tabela de
   hashes. É o que destrava #13 (mkoverlay no cache frio) e #44 (classificador de

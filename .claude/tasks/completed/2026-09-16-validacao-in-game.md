@@ -1,7 +1,7 @@
 ---
 created: 2026-09-16
-status: em andamento
-updated: 2026-09-17
+status: concluida
+updated: 2026-09-19
 ---
 
 # Validação in-game (build `dist\Rose`)
@@ -13,7 +13,7 @@ Abrir `dist\Rose\Rose.exe` como administrador (Rose instalado fechado). Evitar s
 |---|---|---|---|
 | A | Travar campeão → dado → escolher outra skin/chroma | `[RANDOM] Random mode DISABLED due to chroma selection` + injeção da escolhida | reportado ok pelo usuário; não aparece no log de 2026-09-17 |
 | B | Travar campeão → dado → não mexer | `[RANDOM] Injecting random skin` + `INJECTION COMPLETED` | reportado ok pelo usuário; não aparece no log de 2026-09-17 |
-| C | Em partida, fechar Rose pela bandeja | `runoverlay stopped by Rose`, sem `INJECTION FAILED`; jogo continua rodando (ADR-007) | **pendente — não executado** |
+| C | Em partida, fechar Rose pela bandeja | `runoverlay stopped by Rose`, sem `INJECTION FAILED`; jogo continua rodando (ADR-007) | **ok (2026-09-19)** — com skin injetada, fechado pela barra de tarefas durante a partida: jogo seguiu normal, sem crash |
 | D | Partida completa | `INJECTION COMPLETED` + `Game ended, stopping overlay process` | **ok (log 2026-09-17 01:45, build do main)** |
 
 ## Rift Clássico (personalizada, fila 3262)
@@ -30,3 +30,10 @@ Skins de Katarina disponíveis na árvore Jade e na biblioteca: 55001, 55009, 55
 | Teste | Log esperado | Status |
 |---|---|---|
 | H | `log_updater_*.log` passa a conter `Remote skin SHA` / `Downloading skins from repository ZIP` | **ok (`Remote skin SHA: f52a5346`, 2026-09-17 01:41)** |
+
+## Fechamento (2026-09-19)
+
+Todos os cenarios executados. O Teste C, ultimo pendente, validou o caminho que a
+etapa 3 do hardening alterou (#9 GameMonitor, #10 Swiftplay, #12 Pengu CLI): com
+skin injetada e partida em andamento, fechar o Rose pela barra de tarefas deixa o
+jogo rodando normalmente, sem crash. E o comportamento que a ADR-007 define.
