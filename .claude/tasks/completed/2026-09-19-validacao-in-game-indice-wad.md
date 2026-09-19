@@ -14,11 +14,11 @@ monitor filtrando `[WADIDX]`, `[COMPAT]`, `[CLASSIC]`, injeção e assinaturas d
 
 | Verificação | Resultado |
 |---|---|
-| Injeções bem-sucedidas | **3** (2 chroma no Rift normal, 1 Rift Clássico) |
+| Injeções bem-sucedidas | **4** (2 chroma no Rift normal, 1 Rift Clássico, 1 ARAM) |
 | `INJECTION FAILED` | 0 |
 | `ERROR` fora da corrida benigna de startup | 0 |
 | `Traceback` / `Missing data` / `Uncaught exception in thread` | 0 |
-| Skin visível em jogo | **confirmado pelo usuário** (Annie skin 9 no Clássico) |
+| Skin visível em jogo | **confirmado pelo usuário** no Clássico (Annie skin 9) e na ARAM (chroma 5058) |
 
 ## Índice de WADs (#45) em produção
 
@@ -40,11 +40,14 @@ reconstruiriam a cada chamada). Gravado em `state\`, nunca na pasta do jogo.
 
 Mesmo mod (`CHROMA_238070`), mesma máquina, minutos de intervalo:
 
-| | Rodada 1 (frio) | Rodada 2 (quente) | Clássico (quente) |
-|---|---|---|---|
-| `mkoverlay` | **44,33 s** | **2,36 s** | **1,84 s** |
-| Jogo congelado | 41 s | ~1 s | ~1 s |
-| Margem até auto-resume (60 s) | 15,7 s | 57,6 s | — |
+| | Rodada 1 (frio) | Rodada 2 (quente) | Clássico | ARAM |
+|---|---|---|---|---|
+| `mkoverlay` | **44,33 s** | **2,36 s** | **1,84 s** | **2,63 s** |
+| Jogo congelado | 41 s | ~1 s | ~1 s | ~1 s |
+| Margem até auto-resume (60 s) | 15,7 s | 57,6 s | — | — |
+
+Depois do primeiro aquecimento, as três injeções seguintes ficaram entre 1,84 s e 2,63 s,
+incluindo mapas diferentes (Rift, Jade/mapId 453, Howling Abyss/mapId 12).
 
 Conclusões no `backlog.md` (seção "#13 — A/B decisivo"): o cache é a variável dominante
 (18,8×), **mas ler só as TOCs não aquece** — o índice leu as 392 TOCs 67 s antes da
@@ -72,11 +75,27 @@ Os dois ciclos fecharam limpos: `Game ended, stopping overlay process`, diretór
 overlay apagado, `Injection completed - lock released`, histórico gravado. Nenhum
 processo suspenso sobrando entre partidas, nenhuma thread órfã.
 
+## ARAM — `queueId=3220`, `mapId=12`
+
+```
+10:26:58 ChampSelect — gameMode=ARAM, mapId=12, queueId=3220
+10:27:45 [INJECT] Final name variable: 'chroma_5058'
+10:27:45 PREPARING INJECTION >>> CHROMA_5058 <<<
+10:27:48 mkoverlay completed in 2.63s
+```
+
+Fase reconhecida normalmente. Troca na bancada não foi testada, então **#28 e #29
+continuam sem cobertura**.
+
 ## Achados de log registrados
 
 - **#64** `WinError 10061` do WebSocket logado como ERROR numa corrida de startup que se
   resolve sozinha (reconectou 15 s depois).
 - **#63** tela de instalação piscando — observação do usuário, precisa de repro visual.
+- **#65** `lifecycle_manager` lê e zera `self.chroma_ui` sem o lock, **8 vezes em 15 min**.
+  Causa raiz: `self.lock.acquire(timeout=0.001)` — 1 ms, o que torna o caminho sem
+  exclusão mútua a regra e não a exceção. Só apareceu na ARAM porque as transições de
+  fase são mais rápidas ali; é pré-existente, exposto pelo teste.
 - `Killed all runoverlay processes for Lobby` (INFO) seguido de `No runoverlay processes
   found to kill` (DEBUG): a mensagem afirma sucesso sem ter feito nada. Mesma família do
   #13b. Não registrado como item próprio por ser trivial.
