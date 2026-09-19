@@ -1,0 +1,38 @@
+# Tool configuration only: Rose is built with PyInstaller (Rose.spec) and its runtime
+# dependencies live in requirements.txt. CI and local checks read the settings below.
+
+[tool.ruff]
+target-version = "py312"
+extend-exclude = [
+    ".claude", "vendor", "test", "testes_Pesados", "scripts",
+    "relay-worker", "skin-key-worker", "build", "dist", "Pengu Loader",
+]
+
+[tool.ruff.lint]
+# Blocking rules: each has zero violations today, so any new one fails CI.
+# Rules that still have violations are ratcheted by scripts/quality_gate.py instead.
+select = [
+    "E9", "F63", "F7", "F82", "F811",  # syntax errors, undefined names, redefinitions
+    "B006", "B008",                    # mutable / call defaults
+    "B012",                            # return/break inside finally swallows the exception
+    "B023",                            # loop variable captured by a closure
+    "E711", "E712", "F632",            # == None, == True, `is` with a literal
+    "S101",                            # assert used for runtime validation
+    "S102", "S307",                    # exec / eval
+    "S113",                            # requests without timeout
+    "S301",                            # pickle
+    "S602", "S605",                    # shell=True
+    "TRY201",                          # `raise e` instead of bare raise
+    "RUF006",                          # asyncio task without a kept reference
+    "PLE",                             # pylint errors
+]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+explicit_package_bases = true
+follow_imports = "silent"
+exclude = [
+    '^\.claude/', '^vendor/', '^test/', '^testes_Pesados/', '^scripts/',
+    '^relay-worker/', '^skin-key-worker/', '^build/', '^dist/',
+]
