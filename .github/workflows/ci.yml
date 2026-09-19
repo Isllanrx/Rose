@@ -1,0 +1,127 @@
+name: CI
+
+# Every job name below is meant to be a required status check on dev and main.
+# merge_group makes the checks run for the merge queue too (without it, a queued
+# PR never gets its required checks and cannot merge).
+on:
+  push:
+    branches: [dev, main]
+  pull_request:
+    branches: [dev, main]
+  merge_group:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  PYTHONUTF8: "1"
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+
+jobs:
+  workflow-security:
+    name: Workflow security (zizmor, actionlint)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Install workflow linters
+        run: python -m pip install zizmor==1.30.1 actionlint-py==1.7.12.24
+      - name: actionlint (syntax, expressions, shell)
+        run: actionlint
+      - name: zizmor (unpinned actions, permissions, injection)
+        run: zizmor --min-severity medium .github
+
+  plugins:
+    name: Pengu plugins (JS syntax)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+      - name: node --check on every tracked plugin file
+        # A syntax error only shows up inside the League client, where the plugin silently
+        # fails to load; catch it here instead.
+        run: |
+          git ls-files -z 'Pengu Loader/plugins/*.js' | xargs -0 -n1 node --check
+
+  python:
+    name: Python (lint, tests, quality ratchet)
+    # Rose is Windows-only: several modules call ctypes.windll at import time.
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt -r requirements-dev.txt
+      - name: Lint (blocking rules from pyproject.toml)
+        run: python -m ruff check .
+      - name: Unit tests (includes the ADR-008 silent-except guard)
+        run: python -m unittest discover -s test -t . -v
+      - name: Quality ratchet (mypy and reported Ruff rules must not grow)
+        run: python scripts/quality_gate.py
+
+  dependencies:
+    name: Dependency audit (pip-audit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Install pip-audit
+        run: python -m pip install pip-audit==2.10.1
+      - name: Fail on vulnerabilities not listed in .github/pip-audit-ignore.txt
+        run: python scripts/audit_dependencies.py
+
+  dependency-review:
+    name: Dependency review (PR)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: moderate
+
+  build:
+    name: Build (PyInstaller smoke)
+    # Only worth building once the code itself is known to be good.
+    needs: python
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Build Pengu Loader and Rose.exe
+        run: python scripts/build_pyinstaller.py
+      - name: Verify the build (files, frozen modules, no bundled cslol-dll.dll)
+        run: python scripts/verify_build.py --fresh-build

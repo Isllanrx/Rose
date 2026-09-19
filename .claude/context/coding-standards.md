@@ -17,7 +17,7 @@
 - **Build local**:
   - Python 3.12 (pyinstaller 6.3.0 não suporta 3.13+).
   - `scripts/build_pyinstaller.py` chama `pyinstaller` do PATH → ativar o venv.
-  - MSBuild do VS Build Tools sem SDK .NET → `MSBUILD_EXE` apontando para wrapper `.cmd` com `dotnet msbuild -restore %*`.
+  - Build sem workarounds (2026-09-19): `scripts/build_pengu_loader.py` usa `dotnet msbuild` quando há SDK .NET e roda `/restore` separado; `build_pyinstaller.py` chama `python -m PyInstaller`. Basta `.venv\Scripts\python.exe scripts/build_pyinstaller.py`. `MSBUILD_EXE` continua aceito para forçar um MSBuild.
   - Pengu Loader compilado localmente sai sem assinatura → bloqueado pelo Smart App Control (`WinError 4551`). Substituir pelos binários assinados da instalação oficial.
   - `cslol-dll.dll` e `hashes.game.txt` não estão no repo: copiar de `C:\Program Files\Rose\_internal\injection\tools\`.
 - **`Rose.exe` exige admin** (`uac_admin=True`): não inicia de shell não elevado ("Permission denied").
