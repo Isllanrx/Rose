@@ -42,3 +42,7 @@
 - **Escapes de barra invertida no heredoc do shell** são colapsados: `\n` vira newline real e
   quebra o literal Python. Ao gerar código com `\n`, `\` ou `%PATH%`, escrever o arquivo com a
   ferramenta de edição em vez de heredoc, ou montar via `chr(10)`/`chr(92)`.
+- **Comentários, docstrings e nomes em inglês** no código. Vale para `#`, `"""` e mensagens
+  de log. A conversa com o usuário é em português; o código, não. Exceção herdada:
+  `testes_Pesados/` e alguns testes nasceram em português — não vão para a `main`, então a
+  correção é de baixa prioridade, mas **arquivo novo já nasce em inglês**.

@@ -106,4 +106,4 @@ ser parcial. Tratar como hipótese até medir depois de um boot.
 Adicionar `.gitattributes` com `text=auto` **renormaliza o repositório inteiro** e gera
 um diff gigante, justamente no que vai virar PR upstream. Seguro só junto do #53 (Ruff
 formatter), no mesmo commit isolado, travado em `.git-blame-ignore-revs`.
-
+| 60 | **Comentarios e docstrings em portugues no codigo** → traduzir para ingles. Producao: `injection/compat/wad_index.py` e `injection/compat/__init__.py` (2 arquivos, ambos vao para a `main`, entao sao os que importam para o PR). Testes: `test/test_hashes_streaming.py`, `test/test_wad_index.py` e os 6 de `testes_Pesados/` (nunca vao para a `main`) | qualidade | Levantado pelo usuario em 2026-09-19. O resto do codigo ja esta em ingles. Nao e prioridade agora, mas **arquivo novo ja nasce em ingles** |
