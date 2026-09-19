@@ -1,6 +1,6 @@
 ---
 updated: 2026-09-19
-sprint: 2026-09-19 — Hardening etapa 3 validado + otimização de memória
+sprint: 2026-09-19 — Hardening etapa 3, otimização e índice de WADs, validados in-game
 ---
 
 # Sprint atual
@@ -121,3 +121,41 @@ Detalhe do #45 e o critério para camada nativa: ver as notas no fim do `backlog
   colateral (thread em background, I/O no start), então é decisão sua.
 - **#44** classificador de compatibilidade, agora desbloqueado.
 - **Conflito `dev` → `main`** com o ferramental, descrito acima. Decisão sua.
+
+
+---
+
+# Fechamento do dia (2026-09-19)
+
+`dev` com **44 commits** à frente. `main` intacta em `45b24701`. Working tree limpo.
+**187 testes unitários** (eram 107) e 14 pesados, todos passando.
+
+## Entregue e validado in-game
+
+| Correção | Antes | Depois |
+|---|---|---|
+| Hardening etapa 3 (#9, #10, #12) | 7 falhas / 14 na pesada | 0 |
+| Pico de RAM no download de hashes (#48) | 692 MB alocados | 2,1 MB |
+| Índice de WADs (#45) | não existia | 802.652 entradas, 6,4 MB, 3,6 µs |
+| Classificador de compatibilidade (#44) | não existia | pronto, **sem call site** |
+| 3 defeitos da revisão de risco | — | corrigidos, 8 de 11 testes falham no código anterior |
+
+Teste in-game: **5 injeções, 5 sucessos, 1 recusa correta** (skin padrão), 1 saída abrupta
+tratada sem resíduo. Zero `INJECTION FAILED`, zero `Traceback`, zero crash de mod, zero
+`ERROR` fora da corrida benigna de startup. Skin confirmada visualmente nas 5.
+Detalhes em `tasks/completed/2026-09-19-validacao-in-game-indice-wad.md`.
+
+## Decisões pendentes do usuário
+
+1. **`dev` → `main`**: o ferramental (`.claude/`, `test/`, `testes_Pesados/`) está commitado na
+   `dev` e iria junto, quebrando o layout upstream. Recomendação: branch `tooling` separada.
+2. **`monitor_auto_resume_timeout`** 60 s → 120 s. A 1ª injeção do dia passou com 15,7 s de folga.
+3. **Ligar o scanner de compatibilidade** à injeção (muda comportamento: recusa antes de suspender).
+4. **`start()` sem ativar o monitor** após 3 s — trade-off da etapa 3, nunca decidido.
+
+## Não verificado
+
+- **Reuso do índice**: o Rose não foi reiniciado no teste. Esperado `Game index ready in 0.0Xs`
+  **sem** a linha `Indexed`. É o único item da validação que ficou aberto.
+- **#28/#29**: troca na bancada da ARAM, sem cobertura de teste nem in-game.
+- **#49**: biblioteca de skins vazia mantém 5 testes pulando.
