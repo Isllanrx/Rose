@@ -38,7 +38,7 @@ Opções, com a recomendação primeiro:
 ## Estado
 
 ```
-dev   3b5180f2   (20 commits à frente)
+dev   ce265ee4   (53 commits à frente, 2026-09-19 fim do dia)
 main  45b24701   intacta, igual a origin/main
 ```
 
@@ -164,7 +164,7 @@ Detalhes em `tasks/completed/2026-09-19-validacao-in-game-indice-wad.md`.
 
 # Investigação #68 — Rift Clássico `Final name 'None'` (2026-09-19, tarde)
 
-- Branch `diag/jade-skin-selection` (a partir da `dev`), **não commitada**: só logs em 4 arquivos
+- Branch `diag/jade-skin-selection` (**mergeada na `dev` em `f6eedfe0` e apagada**): logs em 4 arquivos
   (`websocket_event_handler`, `skin_processor`, `champion_lock_handler`, `loadout_ticker`).
 - Validação: 196 unitários OK (9 novos, 6 falham no código anterior), 14 pesados OK, logs
   confirmados dentro do PYZ do `dist\Rose\Rose.exe`.

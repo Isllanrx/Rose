@@ -31,4 +31,5 @@
 | **skins-pane** | Componente de seleção de skin do Rift Clássico (`.skins-pane__skin-title`, `__locked-overlay`, `__sub-title`) |
 | **Skin/chroma exclusivo do Clássico** | Números ≥ 300 (ex.: 60001301 "Annie Clássica"); só existem na árvore Jade |
 | **Smart App Control** | Política do Windows que bloqueia executáveis sem assinatura (`WinError 4551`) |
+| **silent-ok** | Marcador na linha de um `except` que não loga de propósito (`# silent-ok: <motivo>`); exigido pela ADR-008 e verificado por `test/test_no_silent_exceptions.py` |
 | **r3dlog** | Log do processo do jogo em `<League>\Logs\GameLogs\` |

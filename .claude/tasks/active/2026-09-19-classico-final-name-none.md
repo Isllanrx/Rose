@@ -1,6 +1,6 @@
 ---
 updated: 2026-09-19
-branch: diag/jade-skin-selection
+branch: mergeada na dev (f6eedfe0), apagada
 status: teste in-game local sem reprodução; aguardando log do testador
 ---
 
