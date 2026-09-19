@@ -84,7 +84,9 @@ def build_with_pyinstaller():
     
     # Use spec file which has all the configuration
     cmd = [
-        "pyinstaller",
+        sys.executable,
+        "-m",
+        "PyInstaller",
         "--clean",
         "--noconfirm",
         "Rose.spec",

@@ -55,6 +55,7 @@ ENV/
 .idea/
 .claude/
 .claude/settings.local.json
+.agents/
 
 # Local / temp
 vibeship-ai-fix-prompt-383e53c2-917d-4722-b35e-0f17148c8af5.txt
