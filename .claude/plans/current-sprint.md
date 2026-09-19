@@ -186,7 +186,7 @@ Detalhes em `tasks/completed/2026-09-19-validacao-in-game-indice-wad.md`.
 Mergeado na `dev` (`924f122d`), cada item em branch própria, validado e com testes:
 - `fix/log-noise`: #22, #64, #25 (sem ERROR falso do WebSocket, sem flood de recusa).
 - `ci/quality-workflow` + `ci/pipeline-hardening`: CI completo (ADR-009, ADR-010). Nunca rodou no GitHub
-  (nada foi enviado). **Pendente do usuário:** ruleset no GitHub com os checks obrigatórios (lista na ADR-010).
+  (nada foi enviado). Code security ativado pelo usuário; ruleset **adiado por decisão dele** (único contribuidor). Regra prática: CI verde na `dev` antes de `dev` → `main`.
 - `fix/build-without-workarounds`: build sem wrapper nem PATH; `/restore` separado corrige `MSB3644` em
   clone limpo (#20). Comando: `.venv\Scripts\python.exe scripts\build_pyinstaller.py`
   (instalador junto: `scripts\build_all.py`, exige Inno Setup 6).

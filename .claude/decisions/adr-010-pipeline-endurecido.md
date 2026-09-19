@@ -1,6 +1,6 @@
 # ADR-010 — Pipeline de CI endurecido para não quebrar produção no merge
 
-- **Status:** aceito (configuração do GitHub pendente, ver "Passo manual")
+- **Status:** aceito. Em 2026-09-19 o usuário ativou Code security (dependency graph, Dependabot, CodeQL via workflow) e **decidiu não criar o ruleset por enquanto** (único contribuidor). Enquanto isso o CI só avisa: conferir a última execução verde na `dev` antes de promover para a `main`. Criar o ruleset quando houver outro contribuidor ou PR externo.
 - **Data:** 2026-09-19
 - **Amplia:** ADR-009
 
