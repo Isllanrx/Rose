@@ -162,3 +162,31 @@ Ler cabecalho + TOC nao aquece o que ele precisa: ele le o **conteudo** dos WADs
 - o jogo ficou **41 s congelado** (suspend 10:16:52 -> resume 10:17:33), o que por si so e ruim de UX;
 - caminhos que sobram: subir o teto do timeout (compra margem, nao resolve), pre-aquecer lendo o
   conteudo dos WADs relevantes ao mod (caro), ou atacar o lado do `mod-tools`.
+
+## #13 — A/B decisivo na mesma sessao (2026-09-19)
+
+Duas injecoes do **mesmo mod** (`CHROMA_238070`), mesma maquina, mesma sessao do Rose, com
+poucos minutos de intervalo. Unica variavel: o cache de disco.
+
+| | Rodada 1 (frio) | Rodada 2 (quente) | Fator |
+|---|---|---|---|
+| `mkoverlay` | 44,33 s | **2,36 s** | **18,8x** |
+| Jogo congelado | 41 s | ~1 s | 41x |
+| Margem ate o auto-resume (60 s) | 15,7 s | 57,6 s | |
+
+**Conclusoes, e as duas medicoes sao necessarias para chegar nelas:**
+
+1. O cache de disco **e** a variavel dominante — confirmado (18,8x). Consistente com os 97,63 s
+   vs 4,20 s registrados antes.
+2. Mas **ler so as TOCs nao aquece**: o indice leu as 392 TOCs 67 s antes da rodada 1, e ela
+   ainda levou 44,33 s. Logo, um pre-aquecimento eficaz precisa tocar o **conteudo** dos WADs
+   que o `mkoverlay` le, nao o indice deles.
+3. Portanto o #13 e um problema de **primeira injecao apos o boot**, nao de toda injecao. Isso
+   **rebaixa a prioridade** dele: o caso comum (segunda partida em diante) ja custa ~2 s.
+4. O risco residual e real e estreito: na primeira injecao do dia sobram 15,7 s de margem. Disco
+   mais lento, antivirus varrendo ou jogo recem-atualizado estouram os 60 s — e ai o mod nao
+   carrega **sem erro visivel**.
+
+**Correcao mais barata e honesta:** subir `monitor_auto_resume_timeout` (teto 180 s no codigo)
+nao resolve a causa mas elimina o risco residual quase todo, a custo de congelar o jogo por mais
+tempo no pior caso. Pre-aquecer conteudo e caro e so ajuda a primeira vez.
