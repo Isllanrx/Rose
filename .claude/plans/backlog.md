@@ -122,3 +122,14 @@ precisa respeitar:
 - avisar na UI com os alvos pendurados (backlog #47);
 - custo: o scan le todas as entradas legiveis do mod. Mod redirect (99,5% da biblioteca) tem
   1-2 entradas de ~3 KB, entao e irrelevante; mod de conteudo pode ter centenas.
+
+## Pre-requisito do build ao ligar o scanner (#44)
+
+`injection.compat.mod_scanner` **nao entra no build** enquanto nao tiver call site: o
+PyInstaller so empacota o que alcanca por import estatico. Confirmado no build de 2026-09-19,
+onde `injection.compat.wad_index` esta no PYZ (importado por `manager.py`) e o `mod_scanner`
+nao. Ao ligar, conferir que ele aparece no PYZ; se o import for dinamico, adicionar a
+`hiddenimports` do `Rose.spec`.
+
+Verificacao correta (grep no `.exe` da falso negativo): extrair `PYZ-00.pyz` do CArchive com
+`PyInstaller.archive.readers.CArchiveReader` e listar o TOC do `ZlibArchiveReader`.
