@@ -14,11 +14,11 @@ monitor filtrando `[WADIDX]`, `[COMPAT]`, `[CLASSIC]`, injeção e assinaturas d
 
 | Verificação | Resultado |
 |---|---|
-| Injeções bem-sucedidas | **4** (2 chroma no Rift normal, 1 Rift Clássico, 1 ARAM) |
+| Injeções bem-sucedidas | **4** (2 Practice Tool no Rift, 1 Rift Clássico personalizada, 1 ARAM) |
 | `INJECTION FAILED` | 0 |
 | `ERROR` fora da corrida benigna de startup | 0 |
 | `Traceback` / `Missing data` / `Uncaught exception in thread` | 0 |
-| Skin visível em jogo | **confirmado pelo usuário nas 4 injeções**: Rift normal (chroma 238070), Rift Clássico (Annie skin 9) e ARAM (chroma 5058) |
+| Skin visível em jogo | **confirmado pelo usuário nas 4 injeções**: Practice Tool (chroma 238070), Rift Clássico (Annie skin 9) e ARAM (chroma 5058) |
 
 ## Índice de WADs (#45) em produção
 
@@ -86,6 +86,20 @@ processo suspenso sobrando entre partidas, nenhuma thread órfã.
 
 Fase reconhecida normalmente. Troca na bancada não foi testada, então **#28 e #29
 continuam sem cobertura**.
+
+## Cobertura por modo — o que cada rodada provou
+
+| Rodada | `FINALIZATION` + ticker | Cobriu |
+|---|---|---|
+| Practice Tool ×2 (`queueId=3140`) | **não** | Mecânica da injeção e o A/B frio×quente (1ª injeção após boot) |
+| Rift Clássico personalizada (`3262`) | **sim**, `T-30s` | Gatilho por threshold, `WadReader`, IDs deslocados |
+| ARAM (`3220`) | **sim**, `T-44s` | Gatilho por threshold em outro modo/mapa |
+
+A Practice Tool **não passa por `FINALIZATION` nem pelo ticker** — injeta por outro caminho.
+Isso foi coberto pelas outras duas rodadas. Em compensação, só ela deu a medição de cache frio.
+
+**Continua sem cobertura:** champ select com outros jogadores (bans, trocas, rotação de
+picks) e troca na bancada da ARAM (#29).
 
 ## Achados de log registrados
 
