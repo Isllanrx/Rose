@@ -46,3 +46,12 @@
   de log. A conversa com o usuário é em português; o código, não. Exceção herdada:
   `testes_Pesados/` e alguns testes nasceram em português — não vão para a `main`, então a
   correção é de baixa prioridade, mas **arquivo novo já nasce em inglês**.
+- **Entradas WAD de tipo 4 (zstd chunked) não são lidas** pelo `WadReader` — e são **mais da
+  metade** das entradas de um WAD de campeão (medido: 227 de 445 em 3 WADs). Qualquer varredura
+  que percorra todas as entradas precisa tratar isso como "não inspecionado", nunca como dano.
+  Por isso `CompatReport` separa `has_dangling_links` (evidência positiva de crash) de
+  `complete` (tudo foi realmente lido). **Nunca recusar injeção por `not complete`.**
+- **`WadReader.read()` devolve `Optional[bytes]`** e `classic_skin_builder.py:326` passa o
+  resultado direto para `retarget_skin_bin(source: bytes, ...)`. Se a entrada não existir, quebra
+  com AttributeError. Bug latente pré-existente, no caminho do Clássico que hoje tem 3 testes
+  pulando — não mexer sem cobertura (backlog #61).

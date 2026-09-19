@@ -107,3 +107,18 @@ Adicionar `.gitattributes` com `text=auto` **renormaliza o repositório inteiro*
 um diff gigante, justamente no que vai virar PR upstream. Seguro só junto do #53 (Ruff
 formatter), no mesmo commit isolado, travado em `.git-blame-ignore-revs`.
 | 60 | **Comentarios e docstrings em portugues no codigo** → traduzir para ingles. Producao: `injection/compat/wad_index.py` e `injection/compat/__init__.py` (2 arquivos, ambos vao para a `main`, entao sao os que importam para o PR). Testes: `test/test_hashes_streaming.py`, `test/test_wad_index.py` e os 6 de `testes_Pesados/` (nunca vao para a `main`) | qualidade | Levantado pelo usuario em 2026-09-19. O resto do codigo ja esta em ingles. Nao e prioridade agora, mas **arquivo novo ja nasce em ingles** |
+| ~~44~~ | ~~Classificador de compatibilidade de mods~~ | **feito como modulo, sem call site** | `injection/compat/mod_scanner.py`. Link resolve contra jogo UNIAO entradas do proprio mod. `has_dangling_links` = evidencia positiva de crash; `complete` = tudo foi lido. 27 testes |
+| 61 | `WadReader.read()` devolve `Optional[bytes]` e `classic_skin_builder.py:326` passa direto para `retarget_skin_bin(source: bytes, ...)` → AttributeError se a entrada faltar | bug | Latente, pre-existente. Caminho do Classico com 3 testes pulando: **nao mexer sem cobertura** (#49) |
+| 62 | Suporte a entrada WAD tipo 4 (zstd chunked) no `WadReader` | feature | 227 de 445 entradas medidas em WADs de campeao. Sem isso o scanner do #44 inspeciona menos da metade de um mod de conteudo |
+
+## Ligar o scanner de compatibilidade ao app (sucessor do #44)
+
+`scan_mod` esta pronto e testado, **sem call site**. Ligar significa recusar injecao antes de
+suspender o jogo, que e mudanca de comportamento visivel ao usuario. Regras que o call site
+precisa respeitar:
+
+- recusar **so** quando `has_dangling_links` for True — evidencia positiva;
+- **nunca** recusar por `scan_mod` devolver `None` (ilegivel) nem por `not complete`;
+- avisar na UI com os alvos pendurados (backlog #47);
+- custo: o scan le todas as entradas legiveis do mod. Mod redirect (99,5% da biblioteca) tem
+  1-2 entradas de ~3 KB, entao e irrelevante; mod de conteudo pode ter centenas.
