@@ -50,13 +50,13 @@ Ordenado por prioridade. Checklists detalhados: skills `prod-risk-review` e `win
 | 41 | Upstream #7: responder análise e sanitizar `,` em `overlay_manager.py:435` | segurança | Auditorias §8, prioridade 6; risco baixo |
 | 42 | Upstream PR #244 (fila 490): testar e comentar a favor | upstream | Sem código nosso |
 | 43 | Upstream PR #211: ajudar a atualizar se o PR local entrar antes | upstream | Conflito em `injection_trigger.py` |
-| 44 | **Classificador de compatibilidade de mods** (`injection/compat/`): detectar link pendurado contra o jogo instalado e recusar injeção antes de suspender o jogo | feature/bug | Crash validado in-game; skill `fantome-compat-rebase` |
-| 45 | Índice de hashes dos WADs do jogo construído 1× por patch em background, invalidado por `content-metadata.json` | desempenho | **Medido 2026-09-19** no jogo instalado: 392 WADs / 31,5 GB → 898.520 entradas, construcao em **5,00 s**, pico de 9 MB, indice de **7 MB** em disco (u64 ordenado + mmap + bisect). Pré-requisito do #44; resolve junto o #13 |
+| 44 | **Classificador de compatibilidade de mods** (desbloqueado pelo #45) (`injection/compat/`): detectar link pendurado contra o jogo instalado e recusar injeção antes de suspender o jogo | feature/bug | Crash validado in-game; skill `fantome-compat-rebase` |
+| ~~45~~ | ~~Índice de hashes dos WADs do jogo~~ | **feito (módulo), sem call site** | **Medido 2026-09-19** no jogo instalado: 392 WADs / 31,5 GB → 898.520 entradas, construcao em **5,00 s**, pico de 9 MB, indice de **7 MB** em disco (u64 ordenado + mmap + bisect). Pré-requisito do #44; resolve junto o #13 |
 | 46 | Reparo determinístico: reconstruir alvo `_Multi_Skins_` a partir dos slots do **jogo** e reescrever a lista `linked` do PROP | feature | Cobre 108 dos 110 casos medidos; supera o gap do Hematite |
 | 47 | Aviso na UI quando um mod custom for recusado por incompatibilidade, com o alvo pendurado | UX | Hoje não existe; complementa #16 |
 | ~~48~~ | ~~Pico de ~940 MB no download da tabela de hashes~~ | **corrigido e validado** | `perf(hashes)` na `dev`. Quatro copias de 230 MB vivas ao mesmo tempo. Medido com `tracemalloc` na mesma entrada real: **692 MB → 2,1 MB** de pico alocado. Saida SHA-256 identica em 230.694.084 bytes. Ganho extra: `atomic_write`, entao parte que falha no meio nao deixa tabela truncada |
 | 49 | Biblioteca de skins vazia em `%LOCALAPPDATA%\Rose\skins`: **5 testes pulam** (3 unitarios + 2 pesados). Rift Classico e integridade da biblioteca ficam sem cobertura | teste | Descoberto na validacao de 2026-09-19. `get_skins_dir()` *cria* o diretorio ao ser chamada, o que mascara a ausencia |
-| 50 | Caminhos absolutos com nome de usuario em `test/test_classic_skins.py:467,478,493` → trocar por `get_skins_dir()` | qualidade | Era o #2b. Contido na `dev` (o arquivo nao vai para a `main`), mas quebra em qualquer outra maquina |
+| ~~50~~ | ~~Caminhos absolutos com nome de usuario nos testes~~ | **corrigido** (`get_user_data_dir()`, que não cria `skins/` como efeito colateral) | Era o #2b. Contido na `dev` (o arquivo nao vai para a `main`), mas quebra em qualquer outra maquina |
 | 51 | `.gitattributes` ausente com `core.autocrlf=true` → ruido de fim de linha no PR upstream | chore | Descoberto na validacao de 2026-09-19 |
 | 52 | `uv` + `pyproject.toml` como fonte unica de dependencias (hoje `requirements.txt` com 11 pins) | qualidade | Padrao 2026; mexe no build assinado |
 | 53 | Ruff como **formatter** | qualidade | Padrao 2026. Reformatar 176 arquivos destroi `git blame`: fazer em commit unico e travar em `.git-blame-ignore-revs` |
@@ -82,3 +82,28 @@ do #45 custa 5,00 s e 9 MB em Python puro. **Criterio para reabrir:** construcao
 ou consulta virando caminho quente do #44 em tempo de injecao. Se disparar, modulo pequeno e
 isolado com **fallback Python obrigatorio** — o app nunca pode depender do binario nativo para
 subir. Atencao: `.gitignore` ignora `*.pyd` e `*.c`, entao extensao nativa sumiria do commit.
+
+## Ligar o índice de WADs ao app (sucessor do #45)
+
+O módulo `injection/compat/wad_index.py` está pronto e testado, mas **sem nenhum call
+site** — de propósito, para a entrega não poder alterar comportamento. Ligar ao app é
+passo separado e tem efeito colateral real:
+
+- construção em background no start (thread a mais, I/O de 392 arquivos);
+- onde guardar o índice (`get_state_dir()`, nunca dentro da pasta do jogo);
+- o que fazer enquanto não estiver pronto (o caminho atual precisa continuar valendo).
+
+## Viabilidade do #13 (mkoverlay no cache frio) — não medida
+
+A hipótese é que construir o índice no start aqueça o cache de disco e o `mkoverlay`
+deixe de levar 97 s. **Não dá para testar sem cache frio**, o que exige reiniciar a
+máquina ou descartar o cache do SO. Medições com cache quente não dizem nada sobre isso.
+O índice lê só cabeçalho e TOC; o `mkoverlay` lê mais que isso, então o aquecimento pode
+ser parcial. Tratar como hipótese até medir depois de um boot.
+
+## Viabilidade do #51 (.gitattributes) — adiar
+
+Adicionar `.gitattributes` com `text=auto` **renormaliza o repositório inteiro** e gera
+um diff gigante, justamente no que vai virar PR upstream. Seguro só junto do #53 (Ruff
+formatter), no mesmo commit isolado, travado em `.git-blame-ignore-revs`.
+

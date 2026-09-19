@@ -100,7 +100,24 @@ disputando o mesmo processo, mas é trade-off consciente.
 
 Detalhe do #45 e o critério para camada nativa: ver as notas no fim do `backlog.md`.
 
-## Pendente antes do #45
-- **#49** sincronizar a biblioteca de skins — sem ela, 5 testes pulam e o Rift Clássico
-  fica sem cobertura.
-- **#50** trocar os 3 caminhos hardcoded com nome de usuário por `get_skins_dir()`.
+## Validação final de 2026-09-19 (dev em `17405bc8`, 19 commits à frente)
+
+| Verificação | Resultado |
+|---|---|
+| Working tree | limpo |
+| `main` == `origin/main` | sim, `45b24701` |
+| `.pyc` rastreados | 0 |
+| Nome de usuário em `.py` no repo | 0 arquivos |
+| Compilação geral | OK |
+| Suíte unitária | **137 OK** (eram 116), 3 skipped |
+| Suíte pesada | **14 testes, 12 OK**, 2 skipped |
+| Call sites do `wad_index` | **nenhum** — comportamento em runtime inalterado |
+
+## Pendente
+
+- **#49** sincronizar a biblioteca de skins — sem ela, 5 testes continuam pulando e o
+  Rift Clássico segue sem cobertura. **Precisa de você**, é download.
+- **Ligar o índice ao app** — o módulo está pronto mas isolado. Ligar tem efeito
+  colateral (thread em background, I/O no start), então é decisão sua.
+- **#44** classificador de compatibilidade, agora desbloqueado.
+- **Conflito `dev` → `main`** com o ferramental, descrito acima. Decisão sua.
