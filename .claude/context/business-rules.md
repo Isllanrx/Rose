@@ -45,6 +45,7 @@ Investigação completa: `reviews/2026-09-18-compatibilidade-de-mods-custom.md`.
 - O jogo carrega `Jade_<Campeão>` com slots base 0/301/302, não o personagem normal (ADR-004).
 - O mod é gerado na hora a partir de `jade_*/skins/skinN.bin` do jogo instalado **de cada usuário**; nunca a partir do `.fantome` da comunidade. Não é necessário ter o arquivo da skin na biblioteca (a biblioteca só fornece o nome do WAD do campeão).
 - Campeão e auxiliares (Tibbers, forma puma, dragão, estandarte...) são trocados juntos quando possuem a skin N.
+- Navegar no carrossel do Clássico depende de `session.allowSkinSelection` (LCU); a posse só impede a confirmação no LCU, não a troca do título que o Rose lê. O carrossel volta sozinho para a skin do LCU na entrada do FINALIZATION e no GAME_STARTING: o segundo é **só visual**, depois do limiar do ticker (validado in-game com outro jogador em 2026-09-19).
 - No Clássico o Rose **não força a skin base** (o `skins-pane` do `rcp-fe-lol-jade` reposicionaria o carrossel); em vez disso sobrescreve os slots 0/301/302 **e** o da skin atualmente selecionada no LCU.
 - Skin inexistente na árvore Jade: não injetar e não suspender o jogo; registrar `[CLASSIC] ... cannot be shown in Rift Classic`.
 - Cobertura validada (patch 16.18, catálogo real do cliente): 68/68 campeões, 419/419 skins não-base (incluindo 40 exclusivas) e 1196/1196 chromas geram mod; `mkoverlay` real aceitou 68 mods simultâneos (87 personagens).
