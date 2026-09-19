@@ -21,7 +21,7 @@ mas sem regra que impedisse novos.
   (`ImportError`), processo que sumiu durante iteração, `RuntimeError` de "sem loop rodando",
   infraestrutura do próprio logging, código antes do logging existir.
 - Guarda: `test/test_no_silent_exceptions.py` falha listando `arquivo:linha` de qualquer handler novo
-  sem log nem marcador (escopo: `git ls-files *.py` fora de `vendor/ test/ testes_Pesados/ scripts/`
+  sem log nem marcador (escopo: `git ls-files *.py` fora de `.claude/ vendor/ test/ testes_Pesados/ scripts/`
   e workers).
 
 ## Alternativas consideradas
