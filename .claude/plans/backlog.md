@@ -69,6 +69,8 @@ Ordenado por prioridade. Checklists detalhados: skills `prod-risk-review` e `win
 
 | 63 | **Tela de instalacao pisca e despeja informacao tecnica** ao usuario. Consolidar numa janela unica com progresso; detalhe so para o log | UX | Observado pelo usuario numa instalacao real em 2026-09-19. **Verificado**: `Rose.spec:423` ja usa `console=False`, e `admin_utils.py` e `pengu_loader.py:400` ja passam `CREATE_NO_WINDOW`; o `installer.iss` usa `runhidden`. Restam sem `creationflags`: `update_installer.py:192` (`cmd /c` do batch) e `:312` (updater standalone) — mas esses sao do caminho de **update**, nao do install limpo. Hipotese mais provavel para o caso observado: o texto de status do launcher durante o primeiro start (download de skins + 230 MB de `hashes.game.txt`). **Precisa de repro visual** antes de mexer. Complementa #16 e #47 |
 
+| 64 | **`WinError 10061` do WebSocket logado como ERROR numa corrida de startup que se resolve sozinha**: LCU conecta (porta ok) mas o WS ainda nao aceita; o retry com backoff reconecta ~15s depois. Rebaixar para WARNING/DEBUG enquanto houver retry pendente e so escalar para ERROR se esgotar | log | Observado em 2026-09-19 10:15:24 (`rose_19-09-2026_10-14-04.log:80`), seguido de `WEBSOCKET CONNECTED` as 10:15:39. Pre-existente, ADR-005. Mesma familia do #18 e #19 |
+
 ## Nota sobre Pydantic (#35)
 
 Reavaliar antes de adotar: adiciona dependencia compilada a um bundle PyInstaller que ja
