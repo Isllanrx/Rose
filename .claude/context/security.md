@@ -10,7 +10,7 @@
 - **Analytics**: ID pseudônimo aleatório, não derivado do Machine GUID; desligável via `ANALYTICS_ENABLED`.
 - **Processos**: cleanup encerra apenas `mod-tools.exe`; nunca processos do jogo/cliente.
 - **Bridge local**: escuta apenas em `127.0.0.1`.
-- **Rift Clássico**: o alias do WAD vindo de arquivos da biblioteca é restrito a `[A-Za-z0-9_]+` (vira nome de pasta); WAD/PROP malformados viram `ClassicSkinError` (sem exceção não tratada na thread de injeção). Dependências `xxhash==4.0.1` e `zstandard==0.25.0` fixadas em `requirements.txt`.
+- **Leitura de WAD** (`injection/compat/wad_reader.py`): WAD malformado vira `WadFormatError` (sem exceção não tratada na thread que lê). Dependências `xxhash==4.0.1` e `zstandard==0.25.0` fixadas em `requirements.txt`.
 - **Caminho seguro**: `is_safe_path` compara componentes (`Path.is_relative_to`), não prefixo de string; extração em massa usa `join_within` com a base resolvida uma vez. Entradas do ZIP de skins e caminhos do update incremental fora da pasta são recusados (ADR-006).
 - **Pendente (skill `windows-trust-review`, backlog #3–#8)**: update baixado sem verificação de assinatura; staging e `apply_update.bat` em `%LOCALAPPDATA%` executados elevados; Rose elevado executa `Pengu Loader.exe`/DLLs copiados para `%LOCALAPPDATA%`; `[UninstallRun]` executa exe de `{localappdata}`; `cmd`/`schtasks` por caminho parcial; `Rose.exe` sem VERSIONINFO e `unins000.exe` sem assinatura. Binários oficiais são assinados por "Open Source Developer Alban CLIQUET" (Certum). Nunca propor exclusão no Defender.
 - **Plugins de diagnóstico** (ex.: DomProbe) são só leitura, ficam fora do repositório e devem ser removidos após o uso.

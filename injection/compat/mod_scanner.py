@@ -25,7 +25,7 @@ from typing import Iterable, Iterator, Optional
 
 from utils.core.logging import get_logger
 
-from ..classic.classic_skin_builder import ClassicSkinError, WadReader, wad_path_hash
+from .wad_reader import WadFormatError, WadReader, wad_path_hash
 from .wad_index import WadIndex
 
 log = get_logger()
@@ -159,7 +159,7 @@ def scan_mod(mod_dir: Path, index: WadIndex,
     for wad_path in wads:
         try:
             reader = WadReader(wad_path)
-        except (ClassicSkinError, OSError) as e:
+        except (WadFormatError, OSError) as e:
             log.debug("[COMPAT] %s unreadable: %s", wad_path.name, e)
             unreadable_wads += 1
             continue
@@ -189,7 +189,7 @@ def scan_mod(mod_dir: Path, index: WadIndex,
 
             try:
                 payload = reader.read_hash(entry_hash)
-            except (ClassicSkinError, OSError) as e:
+            except (WadFormatError, OSError) as e:
                 log.debug("[COMPAT] Entry %016x unreadable: %s", entry_hash, e)
                 unreadable += 1
                 continue

@@ -6,6 +6,7 @@ All arbitrary values are centralized here for easy tracking and modification
 """
 
 import configparser
+import io
 import logging
 import shutil
 import sys
@@ -21,8 +22,9 @@ log = logging.getLogger(__name__)
 # APPLICATION METADATA
 # =============================================================================
 
-APP_VERSION = "1.2.14"                          # Application version
+APP_VERSION = "1.4.3"                           # Application version
 APP_USER_AGENT = f"Rose/{APP_VERSION}"  # User-Agent header for HTTP requests
+GAME_EXECUTABLE_NAMES = ("League of Legends.exe", "League of Legends (TM) Client.exe")
 
 _CONFIG = configparser.ConfigParser()
 _CONFIG_MTIME: float = 0.0  # Last known modification time of config.ini
@@ -32,6 +34,53 @@ def get_config_file_path() -> Path:
     config_dir = get_user_data_dir()
     config_dir.mkdir(parents=True, exist_ok=True)
     return config_dir / "config.ini"
+
+
+# config.ini is shared with the Pengu loader and core.dll, which use the Windows
+# INI API: a file without BOM is read and written in the ANSI code page. Writing
+# UTF-8 garbled non-ASCII paths for core.dll (loaderpath under C:\Users\José),
+# which then found no plugins.
+_CONFIG_ENCODING = "mbcs" if sys.platform == "win32" else "utf-8"
+
+
+def _decode_config(data: bytes) -> str:
+    """Decode config.ini, including lines older Rose versions wrote as UTF-8."""
+    if data.startswith(b"\xff\xfe"):
+        return data.decode("utf-16")
+    if data.startswith(b"\xef\xbb\xbf"):
+        data = data[3:]
+    lines = []
+    for line in data.split(b"\n"):
+        line = line.rstrip(b"\r")
+        try:
+            lines.append(line.decode("utf-8"))
+        except UnicodeDecodeError:  # silent-ok: legacy ANSI lines are decoded with the code page below
+            lines.append(line.decode(_CONFIG_ENCODING, errors="replace"))
+    return "\n".join(lines)
+
+
+def read_config_file(config: configparser.ConfigParser, path: Path) -> None:
+    """Read config.ini into config (nothing if it doesn't exist)."""
+    try:
+        data = path.read_bytes()
+    except FileNotFoundError:  # silent-ok: a missing config.ini means defaults
+        return
+    config.read_string(_decode_config(data), source=str(path))
+
+
+def write_config_file(config: configparser.ConfigParser, path: Path) -> None:
+    """Write config.ini in the ANSI code page, atomically: League processes read
+    it through core.dll at any time and must never see a half-written file."""
+    text = io.StringIO()
+    config.write(text)
+    data = text.getvalue().replace("\n", "\r\n").encode(_CONFIG_ENCODING, errors="replace")
+
+    try:
+        with atomic_write(path, "wb") as fh:
+            fh.write(data)
+    except PermissionError:  # silent-ok: handled by the in-place write below
+        # Still locked (core.dll, an antivirus): write in place rather than lose the change
+        path.write_bytes(data)
 
 
 def _reload_config() -> None:
@@ -61,7 +110,7 @@ def _reload_config() -> None:
     _CONFIG.clear()
     if config_path.exists():
         try:
-            _CONFIG.read(config_path)
+            read_config_file(_CONFIG, config_path)
         except Exception as e:
             log.warning(f"Failed to read config file: {e}")
 
@@ -92,7 +141,7 @@ def set_config_option(section: str, option: str, value: str) -> None:
     config = configparser.ConfigParser()
     if config_path.exists():
         try:
-            config.read(config_path)
+            read_config_file(config, config_path)
         except Exception as e:
             # Rewriting from an empty parser would erase every other setting
             log.warning(f"Not saving [{section}] {option}: config file could not be read: {e}")
@@ -101,8 +150,7 @@ def set_config_option(section: str, option: str, value: str) -> None:
         config.add_section(section)
     config.set(section, option, value)
     try:
-        with atomic_write(config_path, "w", encoding="utf-8") as fh:
-            config.write(fh)
+        write_config_file(config, config_path)
     except Exception as e:
         log.warning(f"Failed to write config file: {e}")
 
@@ -178,7 +226,6 @@ GAME_RESUME_MAX_ATTEMPTS = 3                # Max attempts to resume game (handl
 
 # Game delay strategies
 ENABLE_MKOVERLAY_PRIORITY_BOOST = True   # Boost short-lived mkoverlay process priority during injection setup
-ENABLE_RUNOVERLAY_PRIORITY_BOOST = False  # Runoverlay runs for the entire game session; boosting its priority would compete with the game for CPU and cause perf decrease
 ENABLE_GAME_SUSPENSION = True            # Suspend game process during injection (RISKY - may trigger anti-cheat)
 
 
@@ -336,7 +383,7 @@ INTERESTING_PHASES = {
 ANALYTICS_SERVER_URL = 'https://analytics.rosekeys.site/'  # Analytics server endpoint
 ANALYTICS_PING_INTERVAL_S = 900  # Seconds between presence heartbeats (15 minutes)
 ANALYTICS_ENABLED = True  # Enable/disable analytics tracking
-ANALYTICS_TIMEOUT_S = 5 # Request timeout in seconds
+ANALYTICS_TIMEOUT_S = 5  # Request timeout in seconds
 
 # =============================================================================
 # DEFAULT ARGUMENTS

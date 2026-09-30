@@ -34,7 +34,7 @@ _HEADER_STRUCT = struct.Struct("<8sIII")  # magic, format version, entry count, 
 _HEADER_SIZE = _HEADER_STRUCT.size  # 20, padded to 24 below
 _HEADER_PADDED = 24  # multiple of 8, so the u64 block starts aligned
 
-# WAD v3 layout, same values as injection/classic/classic_skin_builder.py
+# WAD v3 layout, same values as injection/compat/wad_reader.py
 _WAD_TOC_OFFSET = 272
 _WAD_ENTRY_SIZE = 32
 _WAD_GLOB = "*.wad.client"

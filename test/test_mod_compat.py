@@ -11,7 +11,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from injection.classic.classic_skin_builder import wad_path_hash
+from injection.compat.wad_reader import wad_path_hash
 from injection.compat import mod_scanner as ms
 from injection.compat import wad_index as wi
 
@@ -236,7 +236,7 @@ class WadReaderStillReadsByPath(unittest.TestCase):
     """read() now delegates to read_hash(); its behaviour must not have moved."""
 
     def test_read_and_read_hash_agree(self):
-        from injection.classic.classic_skin_builder import WadReader
+        from injection.compat.wad_reader import WadReader
         with tempfile.TemporaryDirectory() as temp:
             wad = Path(temp) / "a.wad.client"
             build_wad(wad, {"characters/annie/skins/skin1.bin": b"conteudo"})

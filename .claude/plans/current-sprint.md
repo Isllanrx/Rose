@@ -1,5 +1,5 @@
 ---
-updated: 2026-09-19
+updated: 2026-09-30
 sprint: 2026-09-19 — Hardening etapa 3, otimização e índice de WADs, validados in-game
 ---
 
@@ -34,6 +34,17 @@ Opções, com a recomendação primeiro:
 3. Aceitar o ferramental na `main` e não abrir PR upstream.
 
 **Decisão do usuário pendente.**
+
+## Sync com o upstream 1.4.3 (2026-09-30) — resolvido, aguardando commit
+
+Branch `sync/upstream-1.4.3` (a partir da `dev` `4426d4d8`), merge de `origin/dev` = `upstream/main`
+`1d86b983` em andamento, com os 21 arquivos resolvidos e staged. Decisão e detalhes no ADR-011
+(Clássico pela biblioteca do upstream; builder local removido).
+
+Validado: `ruff check .` limpo; `unittest` em `test/` (224), `injection/tests` (25), `party/tests` (36),
+`pengu/tests` (6), `utils/tests` (35) passando; `node --check` dos plugins ok; `testes_Pesados/run_all.py`
+APTO. **Catraca de qualidade falha** pelo código do upstream (mypy 221→271, TRY400 +8, PLW0603 +4) —
+re-baseline pendente de decisão. Não validado in-game (LTK patcher e biblioteca Clássico são novos).
 
 ## Estado
 

@@ -23,12 +23,8 @@ Changer de skins de League of Legends para Windows. Roda na bandeja do sistema, 
 ### Variante Rift Clássico (`gameMode=JADE`, fila 3262)
 - Detecção em `threads/handlers/game_mode_detector.py` → `state.current_game_mode = "JADE"`.
 - Plugins: `ROSE-SkinMonitor` lê `.skins-pane__skin-title`; `ROSE-UI` esconde o cadeado do `.skins-pane` e troca o subtítulo "Desabilitada" pelo rótulo localizado de habilitada.
-- `InjectionManager.inject_skin_immediately` → `SkinInjector.prepare_classic_mod` (antes do monitor que suspende o jogo) → `injection/classic/classic_skin_builder.py`:
-  1. normaliza IDs do cliente (`60000 + campeão`, `60000000 + skin`);
-  2. alias do WAD via qualquer arquivo da biblioteca do campeão (`champion_alias_from_library`, cache em memória);
-  3. índice de personagens `jade_*` do `hashes.game.txt` (cache em `state/classic_characters.json`);
-  4. lê `jade_*/skins/skinN.bin` do WAD **instalado** (`WadReader`) e gera `skin0/301/302.bin` para campeão e auxiliares;
-  5. entrega a pasta do mod para `SkinInjector.inject_skin(prepared_mod=...)`.
+- Abordagem do upstream (ADR-011): `RepoDownloader` sincroniza a pasta `classic/` do LeagueSkins em `%LOCALAPPDATA%/Rose/classic`; em `JADE`, `InjectionManager.inject_skin_immediately` passa `classic=True` e `SkinInjector.inject_skin` resolve o arquivo nessa biblioteca (`injection/classic.py` mapeia os IDs do cliente `60000 + campeão` / `60000000 + skin` para os IDs em que a biblioteca guarda cada skin).
+- O mod substitui a skin padrão do `Jade_<Campeão>`, por isso o gatilho força a skin base também no Clássico.
 
 ## Módulos
 | Pasta | Responsabilidade |

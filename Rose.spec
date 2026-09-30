@@ -32,13 +32,15 @@ else:
 import os
 
 # Binary files (executables and DLLs) - these go in binaries, not datas
-# NOTE: cslol-dll.dll is NOT included - users must provide their own due to DMCA
+# NOTE: the LTK patcher (ltk_patcher_host.exe + ltk_patcher_dll.dll) is NOT included - users provide their own
 injection_binaries = [
     'injection/tools/mod-tools.exe',
+    'injection/tools/cslol-dll.dll',  # Rose's stand-in, built from native/cslol_stub
 ]
 # Data files (text files, etc.)
 injection_data_files = [
     'injection/tools/hashes.game.txt',
+    'injection/tools/cslol-dll.stub',  # Copy of the stand-in; the pre-1.2.15 updater skips cslol-dll.dll
 ]
 # Verify and add injection binaries
 binaries = []
@@ -145,6 +147,7 @@ hiddenimports = [
     'main.runtime.loop',
     # Core app modules
     'injection',
+    'injection.classic',
     'injection.core',
     'injection.core.injector',
     'injection.core.manager',
@@ -222,6 +225,7 @@ hiddenimports = [
     'utils.core.validation',
     'utils.core.normalization',
     'utils.core.historic',
+    'utils.core.modpkg',
     'utils.system',
     'utils.system.admin_utils',
     'utils.system.win32_base',
@@ -296,6 +300,7 @@ hiddenimports = [
     'party.core',
     'party.core.party_manager',
     'party.core.party_state',
+    'party.core.party_storage',
     'party.network',
     'party.network.peer_connection',
     'party.network.ws_relay',
@@ -303,8 +308,12 @@ hiddenimports = [
     'party.protocol.message_types',
     'party.protocol.token_codec',
     'party.discovery',
+    'party.discovery.custom_mods',
     'party.discovery.lobby_matcher',
     'party.discovery.skin_collector',
+    'party.integration',
+    'party.integration.injection_hook',
+    'certifi',
     
     # System tray
     'pystray',
@@ -314,6 +323,8 @@ hiddenimports = [
     
     # Other dependencies
     'psutil',
+    'xxhash',  # .modpkg checksums
+    'zstandard',  # .modpkg compression
     
     # Top-level modules
     'config',
@@ -326,7 +337,6 @@ excludes = [
     'setuptools',
     'pip',
     'wheel',
-    'distutils',
     'PySide2',
     'PySide6',
     # Exclude removed packages
@@ -383,10 +393,10 @@ excludes = [
     'relay_server',
 ]
 
-# Filter out cslol-dll.dll from binaries (users must provide their own due to DMCA)
+# Filter out user-provided patcher binaries (not redistributed with Rose)
 def filter_binaries(binaries_list):
     return [(name, path, typ) for name, path, typ in binaries_list
-            if 'cslol-dll' not in name.lower()]
+            if 'ltk_patcher' not in name.lower()]
 
 a = Analysis(
     ['main.py'],
@@ -404,7 +414,7 @@ a = Analysis(
     noarchive=False,
 )
 
-# Remove cslol-dll.dll if PyInstaller auto-detected it
+# Remove user-provided patcher binaries if PyInstaller auto-detected them
 a.binaries = filter_binaries(a.binaries)
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)

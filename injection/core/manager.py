@@ -99,11 +99,17 @@ class InjectionManager:
     def _start_monitor(self):
         """Start game monitor - watches for game and suspends it"""
         self.game_monitor.start()
-
+        # The LTK patcher only overlays games launched after it started
+        # scanning: start it now, before the mods are prepared
+        if self.injector:
+            self.injector.overlay_manager.start_patcher_early()
+    
     def _stop_monitor(self):
         """Stop the game monitor"""
         self.game_monitor.stop()
-
+        if self.injector:
+            self.injector.overlay_manager.discard_early_patcher()
+    
     def _get_suspended_game_process(self):
         """Get the currently suspended game process (if any)"""
         return self.game_monitor.get_suspended_game_process()
@@ -205,7 +211,7 @@ class InjectionManager:
         # This prevents unnecessary suspension for base skins and owned skins
         pass
 
-    def inject_skin_immediately(self, skin_name: str, stop_callback=None, chroma_id: int = None, champion_name: str = None, champion_id: int = None, classic_selected_skin_id: Optional[int] = None) -> bool:
+    def inject_skin_immediately(self, skin_name: str, stop_callback=None, chroma_id: int = None, champion_name: str = None, champion_id: int = None) -> bool:
         """Immediately inject a specific skin (with optional chroma)
 
         Args:
@@ -244,6 +250,52 @@ class InjectionManager:
             except (ValueError, IndexError):  # silent-ok: non-numeric names take the regular injection path
                 pass  # Not a numeric skin ID, continue with normal injection
 
+        classic = is_classic_game_mode(getattr(self.shared_state, "current_game_mode", None))
+
+        def inject(extra_mods_callback):
+            # Pass the manager instance so injector can call resume_game()
+            return self.injector.inject_skin(
+                skin_name,
+                stop_callback=stop_callback,
+                injection_manager=self,
+                chroma_id=chroma_id,
+                champion_name=champion_name,
+                champion_id=champion_id,
+                extra_mods_callback=extra_mods_callback,
+                classic=classic,
+            )
+
+        success = self._run_injection(skin_name, inject)
+        if success:
+            self.last_skin_name = skin_name
+        return success
+
+    def inject_party_skins_only(self, stop_callback=None) -> bool:
+        """Inject only party members' skins (our own champion keeps its default skin)
+
+        Args:
+            stop_callback: Callback to check if injection should stop
+        """
+        def inject(extra_mods_callback):
+            if not extra_mods_callback:
+                log.info("[INJECT] No party skins to inject")
+                return False
+            return self.injector.inject_extra_mods(
+                extra_mods_callback,
+                stop_callback=stop_callback,
+                injection_manager=self,
+            )
+
+        return self._run_injection("party skins", inject)
+
+    def _run_injection(self, label: str, inject) -> bool:
+        """Run one injection under the injection lock
+
+        Args:
+            label: What is injected (for logs and issue reports)
+            inject: callback(extra_mods_callback) -> bool doing the injection;
+                extra_mods_callback adds party member skins (None without party)
+        """
         self._ensure_initialized()
         self.refresh_injection_threshold()
 
@@ -255,7 +307,7 @@ class InjectionManager:
 
         # Check if injection already in progress
         if self._injection_in_progress:
-            log.warning(f"[INJECT] Injection already in progress - skipping request for: {skin_name}")
+            log.warning(f"[INJECT] Injection already in progress - skipping request for: {label}")
             return False
 
         # Try to acquire lock with timeout to prevent indefinite blocking
@@ -266,20 +318,20 @@ class InjectionManager:
                 "INJECTION_LOCK_TIMEOUT",
                 "warning",
                 "Injection skipped (another injection was still running).",
-                details={"lock_timeout_s": f"{INJECTION_LOCK_TIMEOUT_S:.1f}", "skin": skin_name},
+                details={"lock_timeout_s": f"{INJECTION_LOCK_TIMEOUT_S:.1f}", "skin": label},
                 hint="Try again in a few seconds.",
             )
             return False
 
         try:
             self._injection_in_progress = True
-            log.debug(f"[INJECT] Injection started - lock acquired for: {skin_name}")
+            log.debug(f"[INJECT] Injection started - lock acquired for: {label}")
 
             current_time = time.time()
             elapsed = current_time - self.last_injection_time
             if self.last_injection_time and elapsed < self.injection_threshold:
                 remaining = self.injection_threshold - elapsed
-                log.debug(f"[INJECT] Skipping immediate injection for '{skin_name}' (cooldown {remaining:.2f}s remaining)")
+                log.debug(f"[INJECT] Skipping immediate injection for '{label}' (cooldown {remaining:.2f}s remaining)")
                 report_issue(
                     "INJECTION_SKIPPED_COOLDOWN",
                     "info",
@@ -287,7 +339,7 @@ class InjectionManager:
                     details={
                         "remaining_s": f"{remaining:.2f}",
                         "threshold_s": f"{self.injection_threshold:.2f}",
-                        "skin": skin_name,
+                        "skin": label,
                     },
                     hint="Wait a bit, or lower the Injection Cooldown/Threshold in Settings.",
                 )
@@ -300,18 +352,6 @@ class InjectionManager:
                     self.shared_state.ui_skin_thread.force_disconnect()
                 except Exception as e:
                     log.debug(f"[INJECT] Failed to disconnect UIA: {e}")
-
-            prepared_mod = None
-            if self.shared_state and is_classic_game_mode(getattr(self.shared_state, "current_game_mode", None)):
-                prepared_mod = self.injector.prepare_classic_mod(
-                    skin_name,
-                    chroma_id=chroma_id,
-                    champion_name=champion_name,
-                    champion_id=champion_id,
-                    selected_skin_id=classic_selected_skin_id,
-                )
-                if prepared_mod is None:
-                    return False
 
             # Start monitor now (only when injection actually happens)
             # Monitor runs in background and will suspend game if/when it finds it
@@ -335,20 +375,8 @@ class InjectionManager:
                     except Exception as e:
                         log.debug(f"[INJECT] Party injection hook not used: {e}")
 
-            # Pass the manager instance so injector can call resume_game()
-            success = self.injector.inject_skin(
-                skin_name,
-                stop_callback=stop_callback,
-                injection_manager=self,
-                chroma_id=chroma_id,
-                champion_name=champion_name,
-                champion_id=champion_id,
-                extra_mods_callback=extra_mods_callback,
-                prepared_mod=prepared_mod,
-            )
-
+            success = inject(extra_mods_callback)
             if success:
-                self.last_skin_name = skin_name
                 self.last_injection_time = current_time
 
             return success
@@ -507,6 +535,17 @@ class InjectionManager:
 
         cleanup = threading.Thread(target=cleanup_thread, daemon=True, name="CleanupThread")
         cleanup.start()
+    
+    def stop_injection_by_user(self):
+        """Stop the patcher and mod-tools.exe so the game can start without mods"""
+        if not self._initialized:
+            return
+        self._stop_monitor()
+        try:
+            self.injector.stop_injection_by_user()
+            log.info("[INJECT] Injection stopped by the user")
+        except Exception as e:
+            log.warning(f"[INJECT] Failed to stop injection: {e}")
 
     def kill_all_modtools_processes(self):
         """Kill all mod-tools.exe processes (for application shutdown)"""

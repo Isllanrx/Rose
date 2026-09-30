@@ -18,8 +18,8 @@ from utils.core.logging import get_logger, log_action
 from utils.core.junction import is_junction, safe_remove_entry, link_or_extract
 from utils.core.paths import get_injection_dir
 from utils.core.utilities import is_default_skin
-from injection.classic import is_classic_game_mode
 from injection.config.base_skin_tracker import start_tracking as _start_skin_tracking
+from injection.game.game_monitor import make_game_ended_callback
 
 log = get_logger()
 
@@ -180,21 +180,54 @@ class InjectionTrigger:
         # Check if custom mod is selected for this skin (before logging)
         ui_skin_id = self.state.last_hovered_skin_id
         locked_champ_id = self.state.locked_champ_id or self.state.hovered_champ_id
-        if not self._skin_matches_champion(ui_skin_id, locked_champ_id):
-            self._warn_refusal_once("champion mismatch", ui_skin_id, locked_champ_id)
-            return
 
-        # Check if a chroma is selected - if so, use the chroma ID for owned skin forcing
+        # Determine effective skin/chroma ID based on active modes
+        # Priority:
+        # 1. Historic mode (if active and numeric skin/chroma ID)
+        # 2. Random mode (if active and set)
+        # 3. Selected chroma on top of UI hovered skin
+        # 4. Fallback: Parse from resolved injection name
+        historic_active = getattr(self.state, 'historic_mode_active', False)
+        historic_skin_id = getattr(self.state, 'historic_skin_id', None)
+        random_active = getattr(self.state, 'random_mode_active', False)
+        random_skin_id = getattr(self.state, 'random_skin_id', None)
         selected_chroma_id = getattr(self.state, 'selected_chroma_id', None)
-        effective_skin_id = ui_skin_id  # Default to base skin ID
-        if selected_chroma_id and ui_skin_id:
-            # Verify the chroma belongs to this skin (chroma IDs are base_skin_id + offset)
-            # Chromas have IDs like base_skin_id + 1, +2, +3, etc.
-            if selected_chroma_id > ui_skin_id and selected_chroma_id < ui_skin_id + 100:
-                effective_skin_id = selected_chroma_id
-                log.debug(f"[INJECT] Using selected chroma ID {selected_chroma_id} instead of base skin {ui_skin_id}")
-        if not self._skin_matches_champion(effective_skin_id, locked_champ_id):
-            self._warn_refusal_once("effective skin mismatch", effective_skin_id, locked_champ_id)
+
+        effective_skin_id = None
+        if historic_active and historic_skin_id is not None:
+            try:
+                from utils.core.historic import is_custom_mod_path
+                if not is_custom_mod_path(historic_skin_id):
+                    effective_skin_id = int(historic_skin_id)
+            except (ValueError, TypeError):  # silent-ok: custom mod paths and bad ids fall through to the next source
+                pass
+
+        if effective_skin_id is None and random_active and random_skin_id is not None:
+            try:
+                effective_skin_id = int(random_skin_id)
+            except (ValueError, TypeError):  # silent-ok: bad ids fall through to the next source
+                pass
+
+        if effective_skin_id is None:
+            effective_skin_id = ui_skin_id
+            if selected_chroma_id and ui_skin_id:
+                if selected_chroma_id > ui_skin_id and selected_chroma_id < ui_skin_id + 100:
+                    effective_skin_id = selected_chroma_id
+                    log.debug(f"[INJECT] Using selected chroma ID {selected_chroma_id} instead of base skin {ui_skin_id}")
+
+        if effective_skin_id is None and name:
+            try:
+                if name.startswith("skin_") or name.startswith("chroma_"):
+                    effective_skin_id = int(name.split("_", 1)[1])
+            except (IndexError, ValueError):  # silent-ok: names without an id fall through
+                pass
+
+        if ui_skin_id is None:
+            ui_skin_id = effective_skin_id
+
+        skin_to_validate = effective_skin_id if (historic_active or random_active) else ui_skin_id
+        if not self._skin_matches_champion(skin_to_validate, locked_champ_id):
+            self._warn_refusal_once("champion mismatch", skin_to_validate, locked_champ_id)
             return
         # Mark that we've processed the validated hovered skin.
         self.state.last_hover_written = True
@@ -246,6 +279,15 @@ class InjectionTrigger:
         log.info(f"   Loadout Timer: #{ticker_id}")
         log.info("=" * LOG_SEPARATOR_WIDTH)
 
+        # Friends get the skin injected now, not what the client shows once the
+        # base skin is forced below
+        party_manager = getattr(self.state, "party_manager", None)
+        if party_manager and getattr(party_manager, "enabled", False):
+            try:
+                party_manager.freeze_my_selection()
+            except Exception as e:
+                log.debug(f"[PARTY] Could not keep our selection for friends: {e}")
+        
         try:
             lcu_skin_id = self.state.selected_skin_id
             owned_skin_ids = self.state.owned_skin_ids
@@ -371,6 +413,7 @@ class InjectionTrigger:
                                 "target_skin_ids": sorted(target_skin_ids),
                                 "champion_id": champion_id,
                                 "mod_name": selected_mod_entry.mod_name,
+                                "display_name": selected_mod_entry.display_name,
                                 "mod_path": str(selected_mod_entry.path),
                                 "mod_folder_name": mod_folder_name,
                                 "relative_path": historic_custom_mod_path,
@@ -630,7 +673,7 @@ class InjectionTrigger:
             # The mod's own skin_id determines the base skin to inject,
             # regardless of which skin is currently hovered in the UI.
             has_custom_skin_mod = bool(selected_custom_mod)
-            target_skin_id = selected_custom_mod.get("skin_id", ui_skin_id) if selected_custom_mod else ui_skin_id
+            target_skin_id = selected_custom_mod.get("skin_id", effective_skin_id or ui_skin_id) if selected_custom_mod else (effective_skin_id or ui_skin_id)
             has_other_mods = selected_map_mod or selected_font_mod or selected_announcer_mod or (selected_other_mods and len(selected_other_mods) > 0)
             has_any_mods = has_custom_skin_mod or has_other_mods
 
@@ -692,9 +735,10 @@ class InjectionTrigger:
 
             # If only map/font/announcer/other mods are selected (no custom skin mod), inject them
             if has_other_mods and not has_custom_skin_mod:
+                target_skin_id = effective_skin_id or ui_skin_id
                 # Create a dummy custom mod dict to use the injection path
                 dummy_custom_mod = {
-                    "skin_id": ui_skin_id,
+                    "skin_id": target_skin_id,
                     "champion_id": self.state.locked_champ_id or self.state.hovered_champ_id,
                     "mod_name": name.upper(),
                     "mod_folder_name": None,  # No custom skin mod, only map/font/announcer/other
@@ -718,19 +762,24 @@ class InjectionTrigger:
                 mod_types_str = "/".join(selected_mod_types) if selected_mod_types else "Map/Font/Announcer/Other"
 
                 # Check if skin needs to be injected (if unowned, inject base skin ZIP along with map/font/announcer/other mods)
+                is_default = target_skin_id is not None and is_default_skin(target_skin_id)
                 is_skin_owned = (
-                    ui_skin_id is not None and (
-                        is_default_skin(ui_skin_id)
-                        or ui_skin_id in (owned_skin_ids or set())
+                    target_skin_id is not None and (
+                        is_default
+                        or target_skin_id in (owned_skin_ids or set())
                     )
                 )
                 base_skin_name_for_injection = None
-                if not is_skin_owned and ui_skin_id != 0:
+                if not is_skin_owned and target_skin_id != 0 and not is_default:
                     # Skin is unowned, need to inject base skin ZIP along with map/font/announcer/other mods
                     base_skin_name_for_injection = name
-                    log.info(f"[INJECT] {mod_types_str} mod(s) selected + unowned skin {ui_skin_id}, injecting base skin ZIP + {mod_types_str.lower()} mod(s)")
+                    log.info(f"[INJECT] {mod_types_str} mod(s) selected + unowned skin {target_skin_id}, injecting base skin ZIP + {mod_types_str.lower()} mod(s)")
+                elif is_skin_owned and not is_default:
+                    # Skin is owned - force selection in LCU and inject custom mods
+                    self._force_owned_skin(target_skin_id)
+                    log.info(f"[INJECT] {mod_types_str} mod(s) selected + owned skin {target_skin_id}, forced owned skin and injecting {mod_types_str.lower()} mod(s)")
                 else:
-                    # Skin is owned - user can select it normally, just inject the mods
+                    # Default skin - user can select it normally, just inject the mods
                     log.info(f"[INJECT] {mod_types_str} mod(s) selected, injecting them (skin: {name})")
 
                 self._inject_custom_mod(dummy_custom_mod, base_skin_name=base_skin_name_for_injection, champion_name=cname)
@@ -740,10 +789,17 @@ class InjectionTrigger:
             # historic mode is not active — if historic is active, the skin resolver
             # already overrides to the saved skin and injection should proceed normally)
             historic_active = getattr(self.state, 'historic_mode_active', False)
-            if ui_skin_id is not None and is_default_skin(ui_skin_id) and not historic_active:
-                log.info(f"[INJECT] skipping injection for default skin (skinId={ui_skin_id}) - no mods selected")
-                if self.injection_manager:
-                    self.injection_manager.resume_if_suspended()
+            random_active = getattr(self.state, 'random_mode_active', False)
+            is_default = effective_skin_id is not None and is_default_skin(effective_skin_id)
+            if is_default and not historic_active and not random_active:
+                if self.injection_manager and self._has_party_skins():
+                    # Our champion keeps its default skin, but friends' skins still need an overlay
+                    log.info(f"[INJECT] default skin (skinId={effective_skin_id}) - injecting party members' skins only")
+                    self._inject_party_skins_only()
+                else:
+                    log.info(f"[INJECT] skipping injection for default skin (skinId={effective_skin_id}) - no mods selected")
+                    if self.injection_manager:
+                        self.injection_manager.resume_if_suspended()
                 champ_id = self.state.locked_champ_id or self.state.hovered_champ_id
                 if champ_id:
                     from utils.core.historic import clear_historic_entry
@@ -752,24 +808,31 @@ class InjectionTrigger:
 
             # Force owned skins/chromas via LCU
             # Use effective_skin_id which includes the selected chroma if applicable
-            elif effective_skin_id in owned_skin_ids:
+            elif effective_skin_id in owned_skin_ids and not is_default:
                 self._force_owned_skin(effective_skin_id)
                 # Still run injection so overlay is built with our skin + friends' party skins
                 if self.injection_manager:
                     self.injection_manager.inject_skin_immediately(
                         name,
+                        stop_callback=make_game_ended_callback(self.state),
                         champion_name=cname,
                         champion_id=self.state.locked_champ_id or self.state.hovered_champ_id,
                     )
 
             # Also check if base skin is owned but chroma is selected (for owned chromas)
-            elif ui_skin_id in owned_skin_ids and effective_skin_id != ui_skin_id:
+            # (only a chroma of the hovered skin: a historic/random skin is a different skin)
+            elif (
+                ui_skin_id in owned_skin_ids
+                and ui_skin_id < effective_skin_id < ui_skin_id + 100
+                and not is_default
+            ):
                 # Base skin owned, chroma selected - force the chroma
                 self._force_owned_skin(effective_skin_id)
                 # Still run injection so overlay is built with our skin + friends' party skins
                 if self.injection_manager:
                     self.injection_manager.inject_skin_immediately(
                         name,
+                        stop_callback=make_game_ended_callback(self.state),
                         champion_name=cname,
                         champion_id=self.state.locked_champ_id or self.state.hovered_champ_id,
                     )
@@ -857,7 +920,6 @@ class InjectionTrigger:
     def _inject_unowned_skin(self, name: str, cname: str):
         """Inject unowned skin/chroma"""
         try:
-            classic_selected_skin_id = None
             # Force base skin selection via LCU before injecting
             champ_id = self.state.locked_champ_id or self.state.hovered_champ_id
             if champ_id:
@@ -878,27 +940,13 @@ class InjectionTrigger:
                 except Exception as e:
                     log.debug(f"[INJECT] Failed to read actual LCU skin ID: {e}")
 
-                if is_classic_game_mode(getattr(self.state, "current_game_mode", None)):
-                    classic_selected_skin_id = actual_lcu_skin_id
-                    if classic_selected_skin_id is None:
-                        log.warning("[CLASSIC] Current skin selection unknown; only default slots will be overridden")
                 # Only force base skin if current selection is not already base skin
-                elif actual_lcu_skin_id is None or actual_lcu_skin_id != base_skin_id:
+                if actual_lcu_skin_id is None or actual_lcu_skin_id != base_skin_id:
                     self._force_base_skin(base_skin_id)
 
             # Create callback to check if game ended
-            has_been_in_progress = False
-
-            def game_ended_callback():
-                nonlocal has_been_in_progress
-                phase = self.state.phase
-                if phase == "InProgress":
-                    has_been_in_progress = True
-                    return False
-                if phase in ("Reconnect", "GameStart"):
-                    return False
-                return has_been_in_progress and phase not in ("InProgress", "Reconnect", "GameStart")
-
+            game_ended_callback = make_game_ended_callback(self.state)
+            
             # Inject skin in a separate thread
             log.info(f"[INJECT] Starting injection: {name}")
 
@@ -915,7 +963,6 @@ class InjectionTrigger:
                         stop_callback=game_ended_callback,
                         champion_name=cname,
                         champion_id=self.state.locked_champ_id,
-                        classic_selected_skin_id=classic_selected_skin_id,
                     )
 
                     # Clear random state after injection
@@ -1025,6 +1072,37 @@ class InjectionTrigger:
         except Exception as e:
             log.error(f"[INJECT] injection error: {e}")
 
+    def _has_party_skins(self) -> bool:
+        """Check if party mode has friends' skins to inject for this game"""
+        party_manager = getattr(self.state, "party_manager", None)
+        if not party_manager or not getattr(party_manager, "enabled", False):
+            return False
+        try:
+            from party.integration.injection_hook import PartyInjectionHook
+            return PartyInjectionHook(party_manager, self.state, self.injection_manager).has_party_skins()
+        except Exception as e:
+            log.debug(f"[INJECT] Party injection hook not used: {e}")
+            return False
+
+    def _inject_party_skins_only(self):
+        """Inject only party members' skins (our own champion keeps its default skin)"""
+        game_ended_callback = make_game_ended_callback(self.state)
+
+        def run_injection():
+            try:
+                if not self.lcu.ok:
+                    log.warning(f"[INJECT] LCU not available, skipping injection")
+                    return
+                if self.injection_manager.inject_party_skins_only(stop_callback=game_ended_callback):
+                    log.info("[INJECT] Party members' skins injected")
+                else:
+                    log.warning("[INJECT] Party members' skins were not injected")
+            except Exception as e:
+                log.error(f"[INJECT] party injection thread error: {e}")
+
+        injection_thread = threading.Thread(target=run_injection, daemon=True, name="PartyInjectionThread")
+        injection_thread.start()
+
     def _force_base_skin(self, base_skin_id: int):
         """Force base skin selection via LCU"""
         log.info(f"[INJECT] Forcing base skin (skinId={base_skin_id})")
@@ -1103,7 +1181,7 @@ class InjectionTrigger:
                     _start_skin_tracking(base_skin_id)
                 except Exception as e:
                     log.warning("[INJECT] Could not start base skin confirmation tracking: %s", e, exc_info=True)
-
+            
             # Verify the change
             if base_skin_set_successfully:
                 if not getattr(self.state, 'random_mode_active', False):
@@ -1447,18 +1525,8 @@ class InjectionTrigger:
                 self._force_base_skin(base_skin_id)
 
             # Create callback to check if game ended
-            has_been_in_progress = False
-
-            def game_ended_callback():
-                nonlocal has_been_in_progress
-                phase = self.state.phase
-                if phase == "InProgress":
-                    has_been_in_progress = True
-                    return False
-                if phase in ("Reconnect", "GameStart"):
-                    return False
-                return has_been_in_progress and phase not in ("InProgress", "Reconnect", "GameStart")
-
+            game_ended_callback = make_game_ended_callback(self.state)
+            
             # All mods are already extracted, create and run overlay with all mods
             result = injector.overlay_manager.mk_run_overlay(
                 mod_folder_names,

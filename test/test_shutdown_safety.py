@@ -1,4 +1,3 @@
-import builtins
 import ctypes
 import tempfile
 import threading
@@ -167,29 +166,20 @@ class UncaughtThreadExceptionLoggingTests(unittest.TestCase):
 
 
 class NativeDllDialogTests(unittest.TestCase):
-    """Fallback dialog without tkinter uses MB_OKCANCEL: OK returns IDOK (1), Cancel returns IDCANCEL (2)."""
+    """Fallback dialog without TaskDialogIndirect uses MB_OKCANCEL: OK returns IDOK (1), Cancel returns IDCANCEL (2)."""
 
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp_dir.cleanup)
-        real_import = builtins.__import__
-
-        def import_without_tkinter(name, *args, **kwargs):
-            if name == "tkinter" or name.startswith("tkinter."):
-                raise ImportError("tkinter unavailable")
-            return real_import(name, *args, **kwargs)
-
-        patcher = patch.object(builtins, "__import__", side_effect=import_without_tkinter)
-        patcher.start()
-        self.addCleanup(patcher.stop)
 
     def show_dialog(self, button):
         with (
+            patch.object(rose_main, "_show_native_dll_dialog", return_value=None),
             patch.object(ctypes.windll.user32, "MessageBoxW", return_value=button),
             patch("subprocess.run") as run,
             patch("webbrowser.open") as browser,
         ):
-            rose_main._show_dll_dialog_legacy(Path(self.temp_dir.name))
+            rose_main._show_dll_dialog(Path(self.temp_dir.name))
         return run, browser
 
     def test_ok_opens_tools_folder(self):

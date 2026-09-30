@@ -7,7 +7,7 @@ Handles game process monitoring, suspension, and resumption
 
 import threading
 import time
-from typing import Optional
+from typing import Callable, Optional
 
 # Import psutil with fallback for development environments
 try:
@@ -26,6 +26,7 @@ except ImportError:  # silent-ok: optional dependency; PSUTIL_AVAILABLE gates ev
     AccessDenied = PermissionError  # Fallback exception type
 
 from config import (
+    GAME_EXECUTABLE_NAMES,
     PERSISTENT_MONITOR_CHECK_INTERVAL_S,
     PERSISTENT_MONITOR_IDLE_INTERVAL_S,
     GAME_RESUME_MAX_ATTEMPTS,
@@ -36,6 +37,31 @@ from utils.core.logging import get_logger, log_section, log_event, log_success
 from utils.core.issue_reporter import report_issue
 
 log = get_logger()
+_GAME_PROCESS_NAMES = frozenset(name.lower() for name in GAME_EXECUTABLE_NAMES)
+
+
+def make_game_ended_callback(state) -> Callable[[], bool]:
+    """Stop callback for an injection: True once the game it was made for is over.
+
+    The LTK patcher keeps running through reconnects, so every injection must
+    pass one: without it the patcher runs until a later cleanup kills it.
+
+    Args:
+        state: Shared application state (its phase is polled)
+    """
+    has_been_in_progress = False
+
+    def game_ended_callback() -> bool:
+        nonlocal has_been_in_progress
+        phase = state.phase
+        if phase == "InProgress":
+            has_been_in_progress = True
+            return False
+        if phase in ("Reconnect", "GameStart"):
+            return False
+        return has_been_in_progress
+
+    return game_ended_callback
 
 # The monitor loop sleeps in 0.05-0.1s steps, so it notices a lowered flag
 # quickly. The extra margin covers a psutil.process_iter() sweep in progress.
@@ -127,7 +153,7 @@ class GameMonitor:
                         for proc in psutil.process_iter(['name', 'pid']):
                             if not self._monitor_active:
                                 break
-                            if proc.info['name'] == 'League of Legends.exe':
+                            if (proc.info.get('name') or '').lower() in _GAME_PROCESS_NAMES:
                                 try:
                                     game_proc = psutil.Process(proc.info['pid'])
                                     # Check if already suspended
@@ -237,7 +263,7 @@ class GameMonitor:
                         if len(found_processes) < 5:
                             found_processes.append(proc.info.get('name', 'unknown'))
                         
-                        if proc.info['name'] == 'League of Legends.exe':
+                        if (proc.info.get('name') or '').lower() in _GAME_PROCESS_NAMES:
                             try:
                                 game_proc = psutil.Process(proc.info['pid'])
                                 log_event(log, "Game process found", "", {"PID": proc.info['pid']})

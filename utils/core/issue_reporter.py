@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import threading
 import time
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 
 from utils.core.logging import get_logger
 from utils.core.paths import get_user_data_dir
@@ -31,6 +31,9 @@ _ALLOWED_CODES = {
     'BASE_SKIN_FORCE_SLOW',   # Suggest increasing Injection Threshold
     'BASE_SKIN_VERIFY_FAILED',  # Base skin verification mismatch (often causes skin not to show)
     'LOW_DISK_SPACE',         # Injection could not build an overlay with available disk space
+    'LTK_PATCHER_MISSING',    # User-provided LTK patcher files are missing
+    'LTK_PATCHER_EOL',        # LTK patcher DLL no longer supports the current game build
+    'LTK_PATCHER_FAILED',     # LTK patcher host/DLL reported an error
 }
 
 
@@ -111,6 +114,35 @@ def read_issues_tail(*, max_lines: int = 60) -> list[str]:
     except Exception as e:
         log.debug("[ISSUES] Could not read diagnostics file: %s", e)
         return []
+
+
+def remove_issues(should_remove: Callable[[str, str], bool]) -> bool:
+    """Remove the reports for which should_remove(message_line, fix_line) is true (safe, never raises)."""
+    try:
+        with _LOCK:
+            p = _issues_path()
+            if not p.exists():
+                return True
+            lines = p.read_text(encoding="utf-8", errors="ignore").splitlines()
+            kept: list[str] = []
+            i = 0
+            while i < len(lines):
+                line = lines[i]
+                fix = ""
+                # Each report is 1-2 lines: the message line + optional "Fix:" line
+                if " | " in line and i + 1 < len(lines) and lines[i + 1].startswith("Fix:"):
+                    fix = lines[i + 1]
+                    i += 1
+                if not (" | " in line and should_remove(line, fix)):
+                    kept.append(line)
+                    if fix:
+                        kept.append(fix)
+                i += 1
+            p.write_text("\n".join(kept) + "\n" if kept else "", encoding="utf-8")
+        return True
+    except Exception as e:
+        log.debug("[ISSUES] Could not remove diagnostics entries: %s", e)
+        return False
 
 
 def clear_issues() -> bool:
