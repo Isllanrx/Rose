@@ -35,16 +35,15 @@ Opções, com a recomendação primeiro:
 
 **Decisão do usuário pendente.**
 
-## Sync com o upstream 1.4.3 (2026-09-30) — resolvido, aguardando commit
+## Sync com o upstream 1.4.3 (2026-09-30) — na dev
 
-Branch `sync/upstream-1.4.3` (a partir da `dev` `4426d4d8`), merge de `origin/dev` = `upstream/main`
-`1d86b983` em andamento, com os 21 arquivos resolvidos e staged. Decisão e detalhes no ADR-011
+Merge de `origin/dev` = `upstream/main` `1d86b983` em `e8d319e6`, levado para a `dev` em `7abcf45f`
+(não publicado). A partir daqui o trabalho segue direto na `dev`. Decisão e detalhes no ADR-011
 (Clássico pela biblioteca do upstream; builder local removido).
 
 Validado: `ruff check .` limpo; `unittest` em `test/` (224), `injection/tests` (25), `party/tests` (36),
 `pengu/tests` (6), `utils/tests` (35) passando; `node --check` dos plugins ok; `testes_Pesados/run_all.py`
-APTO. **Catraca de qualidade falha** pelo código do upstream (mypy 221→271, TRY400 +8, PLW0603 +4) —
-re-baseline pendente de decisão. Não validado in-game (LTK patcher e biblioteca Clássico são novos).
+APTO. Catraca re-baselinada com a dívida do upstream (mypy 271, TRY400 202, PLW0603 27). Não validado in-game (LTK patcher e biblioteca Clássico são novos).
 
 ## Estado
 
