@@ -9,9 +9,11 @@ import asyncio
 import json
 import logging
 import os
+import queue
 import re
 import subprocess
 import sys
+import threading
 import time
 from datetime import datetime
 from pathlib import Path, PureWindowsPath
@@ -21,7 +23,7 @@ from urllib.parse import quote
 from config import get_config_float, get_config_option, set_config_option
 from injection.mods.storage import ModStorageService
 from utils.core.paths import get_user_data_dir, get_asset_path, get_injection_dir, open_folder_in_explorer
-from utils.core.issue_reporter import clear_issues, read_issues_tail
+from utils.core.issue_reporter import clear_issues, read_issues_tail, remove_issues
 from utils.core.junction import is_junction, safe_remove_entry, link_or_extract
 from utils.core.utilities import get_base_skin_id_for_chroma
 from ui.handlers.randomization_handler import cancel_random_mode_for_selection
@@ -57,6 +59,31 @@ def _is_safe_relative_path(path_value: str) -> bool:
     return all(part not in {"", ".", ".."} for part in candidate.parts)
 
 
+# Messages that wait on the user (file picker) or on disk and LCU work. They run
+# in order on one worker thread, so the bridge keeps answering every plugin
+# meanwhile (Manage Mods stayed on "Loading champions..." during an import)
+BACKGROUND_MESSAGE_TYPES = frozenset({
+    "add-custom-mods-category-selected",
+    "add-custom-mods-champion-selected",
+    "add-custom-mods-skin-selected",
+    "request-manage-champion-mods",
+    "request-manage-category-mods",
+    "delete-champion-mod",
+    "delete-category-mod",
+    "rename-champion-mod",
+    "rename-category-mod",
+})
+
+
+def _mod_thumbnail(mod_folder: Path) -> Optional[Path]:
+    """Return a mod folder's preview image (.fantome mods ship a PNG, .modpkg a WebP)."""
+    for name in ("image.png", "image.webp"):
+        thumbnail_path = mod_folder / "META" / name
+        if thumbnail_path.is_file():
+            return thumbnail_path
+    return None
+
+
 def _choose_mod_file() -> Optional[Path]:
     """Show a native file picker for a user-selected mod archive."""
     root = None
@@ -73,9 +100,10 @@ def _choose_mod_file() -> Optional[Path]:
         selected = filedialog.askopenfilename(
             title="Select a Rose mod file",
             filetypes=[
-                ("Rose mods", "*.fantome *.zip"),
+                ("Rose mods", "*.fantome *.zip *.modpkg"),
                 ("Fantome mods", "*.fantome"),
                 ("ZIP mods", "*.zip"),
+                ("Mod packages", "*.modpkg"),
                 ("All files", "*.*"),
             ],
         )
@@ -120,6 +148,9 @@ class MessageHandler:
             port: Server port
         """
         self.shared_state = shared_state
+        # Worker thread for BACKGROUND_MESSAGE_TYPES, started on first use
+        self._background_queue: Optional[queue.Queue] = None
+        self._background_lock = threading.Lock()
         self.websocket_server = websocket_server
         self.broadcaster = broadcaster
         self.skin_processor = skin_processor
@@ -144,8 +175,8 @@ class MessageHandler:
 
         try:
             if game_dir.exists() and game_dir.is_dir():
-                league_exe = game_dir / "League of Legends.exe"
-                return league_exe.exists() and league_exe.is_file()
+                from config import GAME_EXECUTABLE_NAMES
+                return any((game_dir / name).is_file() for name in GAME_EXECUTABLE_NAMES)
         except Exception as e:
             log.debug(f"[Settings] Could not validate League path {game_path!r}: {e}")
             return False
@@ -165,7 +196,30 @@ class MessageHandler:
             return
         
         payload_type = payload.get("type")
-        
+        if payload_type in BACKGROUND_MESSAGE_TYPES:
+            self._run_in_background(payload_type, payload)
+        else:
+            self._route(payload_type, payload)
+
+    def _run_in_background(self, payload_type: str, payload: dict) -> None:
+        """Queue a message for the worker thread, starting it on first use."""
+        with self._background_lock:
+            if self._background_queue is None:
+                self._background_queue = queue.Queue()
+                threading.Thread(
+                    target=self._background_worker, name="BridgeWorker", daemon=True
+                ).start()
+            self._background_queue.put((payload_type, payload))
+
+    def _background_worker(self) -> None:
+        while True:
+            payload_type, payload = self._background_queue.get()
+            try:
+                self._route(payload_type, payload)
+            except Exception as e:  # noqa: BLE001
+                log.exception("[SkinMonitor] Failed to handle %s: %s", payload_type, e)
+
+    def _route(self, payload_type: Optional[str], payload: dict) -> None:
         # Route to appropriate handler
         if payload_type == "chroma-log":
             self._handle_chroma_log(payload)
@@ -185,6 +239,10 @@ class MessageHandler:
             self._handle_open_mods_folder(payload)
         elif payload_type == "request-skin-mods":
             self._handle_request_skin_mods(payload)
+        elif payload_type == "request-manage-champion-mods":
+            self._handle_request_manage_champion_mods(payload)
+        elif payload_type == "request-manage-category-mods":
+            self._handle_request_manage_category_mods(payload)
         elif payload_type == "request-maps":
             self._handle_request_maps(payload)
         elif payload_type == "request-fonts":
@@ -212,6 +270,10 @@ class MessageHandler:
             self._handle_diagnostics_request(payload)
         elif payload_type == "diagnostics-clear":
             self._handle_diagnostics_clear(payload)
+        elif payload_type == "stop-injection":
+            self._handle_stop_injection(payload)
+        elif payload_type == "diagnostics-delete":
+            self._handle_diagnostics_delete(payload)
         elif payload_type == "diagnostics-clear-category":
             self._handle_diagnostics_clear_category(payload)
         elif payload_type == "diagnostics-clear-tracker":
@@ -222,6 +284,8 @@ class MessageHandler:
             self._handle_open_pengu_loader_ui(payload)
         elif payload_type == "settings-save":
             self._handle_settings_save(payload)
+        elif payload_type == "language-save":
+            self._handle_language_save(payload)
         elif payload_type == "add-custom-mods-category-selected":
             self._handle_add_custom_mods_category_selected(payload)
         elif payload_type == "add-custom-mods-champion-selected":
@@ -232,6 +296,14 @@ class MessageHandler:
             self._handle_find_match_hover(payload)
         elif payload_type == "dismiss-custom-mod":
             self._handle_dismiss_custom_mod(payload)
+        elif payload_type == "delete-champion-mod":
+            self._handle_delete_champion_mod(payload)
+        elif payload_type == "delete-category-mod":
+            self._handle_delete_category_mod(payload)
+        elif payload_type == "rename-champion-mod":
+            self._handle_rename_champion_mod(payload)
+        elif payload_type == "rename-category-mod":
+            self._handle_rename_category_mod(payload)
         elif payload_type == "dismiss-historic":
             self._handle_dismiss_historic(payload)
         # Party mode messages
@@ -404,6 +476,7 @@ class MessageHandler:
             threshold = get_config_float("General", "injection_threshold", 0.5)
             monitor_auto_resume_timeout = get_config_float("General", "monitor_auto_resume_timeout", 60.0)
             autostart = is_registered_for_autostart()
+            hide_empty_categories = (get_config_option("General", "hide_empty_categories", "false") or "false").lower() == "true"
             game_path = get_config_option("General", "leaguePath") or ""
             diagnostics_errors = self._compute_diagnostics_errors()
             
@@ -417,6 +490,7 @@ class MessageHandler:
                 "threshold": threshold,
                 "monitorAutoResumeTimeout": int(monitor_auto_resume_timeout),
                 "autostart": autostart,
+                "hideEmptyCategories": hide_empty_categories,
                 "gamePath": game_path,
                 "gamePathValid": path_valid,
                 "hasErrors": len(diagnostics_errors) > 0,
@@ -425,7 +499,7 @@ class MessageHandler:
             }
             self._send_response(json.dumps(response_payload))
             
-            log.info(f"[SkinMonitor] Settings data sent: threshold={threshold}, monitor_auto_resume_timeout={monitor_auto_resume_timeout}, autostart={autostart}, gamePath={game_path}, valid={path_valid}")
+            log.info(f"[SkinMonitor] Settings data sent: threshold={threshold}, monitor_auto_resume_timeout={monitor_auto_resume_timeout}, autostart={autostart}, hide_empty_categories={hide_empty_categories}, gamePath={game_path}, valid={path_valid}")
         except Exception as e:
             log.error(f"[SkinMonitor] Failed to handle settings request: {e}")
 
@@ -444,6 +518,24 @@ class MessageHandler:
                 self._send_response(json.dumps({"type": "diagnostics-cleared", "success": False}))
             except Exception as send_error:
                 log.debug('[SkinMonitor] Could not send diagnostics failure response: %s', send_error)
+
+    def _handle_stop_injection(self, payload: dict) -> None:
+        """Stop injection from the reconnect screen so a crashing mod can be skipped."""
+        stopped = False
+        try:
+            if self.injection_manager:
+                self.injection_manager.stop_injection_by_user()
+                stopped = True
+        except Exception as e:
+            log.error(f"[SkinMonitor] Failed to stop injection: {e}")
+        self._send_response(json.dumps({"type": "injection-stopped", "success": stopped}))
+
+    def _handle_diagnostics_delete(self, payload: dict) -> None:
+        """Delete the Troubleshooting entries the user dismissed, then resend the list."""
+        keys = {str(k).strip() for k in (payload.get("keys") or []) if str(k).strip()}
+        if keys:
+            self._compute_diagnostics_errors(delete_keys=keys)
+        self._handle_diagnostics_request(payload)
 
     def _handle_diagnostics_clear_category(self, payload: dict) -> None:
         """
@@ -625,8 +717,11 @@ class MessageHandler:
             except Exception as send_error:
                 log.debug('[SkinMonitor] Could not send diagnostics failure response: %s', send_error)
 
-    def _compute_diagnostics_errors(self) -> list[dict]:
-        """Compute compact diagnostics error list from rose_diagnostics.txt (never raises)."""
+    def _compute_diagnostics_errors(self, delete_keys: Optional[set[str]] = None) -> list[dict]:
+        """Compute compact diagnostics error list from rose_diagnostics.txt (never raises).
+
+        With delete_keys, first removes every report whose summary key is in it.
+        """
         try:
             raw_lines = read_issues_tail(max_lines=400)
             now = datetime.now()
@@ -768,11 +863,35 @@ class MessageHandler:
                         'text': 'Low Disk Space -> free up space',
                     }
 
+                # Category: LTK patcher (user-provided injection binaries)
+                if 'ltk patcher' in ml:
+                    if 'end of life' in ml:
+                        return {'code': 'LTK_PATCHER_EOL', 'text': 'LTK patcher outdated -> update'}
+                    if 'missing' in ml:
+                        return {'code': 'LTK_PATCHER_MISSING', 'text': 'LTK patcher missing -> add files'}
+                    return {
+                        'code': 'LTK_PATCHER_FAILED',
+                        'text': 'LTK patcher error',
+                        'detail': msg.split('LTK patcher error:', 1)[-1].strip(),
+                    }
+
                 # Fallback: keep it short
                 short = msg.strip()
                 if len(short) > 60:
                     short = short[:57] + "..."
                 return {"code": "", "text": short or ""} if (short or "") else None
+
+            def _summary_key(msg: str, fix: str) -> str:
+                summary_obj = _summarize(msg, fix)
+                return (summary_obj.get("text") or "").strip() if summary_obj else ""
+
+            if delete_keys:
+                # Drop older duplicates too, or they would take the deleted entry's place
+                remove_issues(
+                    lambda msg_line, fix_line: _summary_key(msg_line.split(" | ", 1)[1].strip(), fix_line.strip())
+                    in delete_keys
+                )
+                entries = [e for e in entries if _summary_key(e.get("msg", ""), e.get("fix", "")) not in delete_keys]
 
             # Keep last N unique summaries (most recent occurrences)
             seen: set[str] = set()
@@ -787,7 +906,7 @@ class MessageHandler:
                 if summary_text in seen:
                     continue
                 seen.add(summary_text)
-                payload = {"ts": _format_ts(ent.get("ts", "")), **summary_obj}
+                payload = {"ts": _format_ts(ent.get("ts", "")), "key": summary_text, **summary_obj}
                 out.append(payload)
                 if len(out) >= 8:
                     break
@@ -861,8 +980,8 @@ class MessageHandler:
             thumbnail_url = None
             try:
                 if entry.path.is_dir():
-                    thumbnail_path = entry.path / "META" / "image.png"
-                    if thumbnail_path.exists() and thumbnail_path.is_file():
+                    thumbnail_path = _mod_thumbnail(entry.path)
+                    if thumbnail_path is not None:
                         thumbnail_relative_path = str(
                             thumbnail_path.relative_to(self.mod_storage.mods_root)
                         ).replace("\\", "/")
@@ -874,6 +993,7 @@ class MessageHandler:
             mods_payload.append(
                 {
                     "modName": entry.mod_name,
+                    "displayName": entry.display_name,
                     "skinId": entry.skin_id,
                     "targetSkinIds": sorted(target_skin_ids),
                     "availableForRequestedSkin": bool(target_skin_ids & compatible_skin_ids),
@@ -917,11 +1037,110 @@ class MessageHandler:
             "championId": champion_id,
             "skinId": skin_id,
             "mods": mods_payload,
+            "hideEmptyCategories": (get_config_option("General", "hide_empty_categories", "false") or "false").lower() == "true",
             "historicMod": historic_mod_path,  # Add historic mod path if available
             "compatibleSkinIds": sorted(compatible_skin_ids),
             "timestamp": int(time.time() * 1000),
         }
         self._send_response(json.dumps(response_payload))
+
+    def _lookup_champion_name(self, champion_id: object) -> Optional[str]:
+        try:
+            champ_id = int(champion_id)
+        except (TypeError, ValueError):  # silent-ok: non-numeric champion id has no name
+            return None
+        scraper = getattr(self, "skin_scraper", None)
+        lcu = getattr(scraper, "lcu", None) if scraper else None
+        if not lcu or not getattr(lcu, "ok", False):
+            return None
+        try:
+            champion_data = lcu.get(
+                f"/lol-game-data/assets/v1/champions/{champ_id}.json",
+                timeout=5.0,
+            )
+        except Exception as e:
+            log.debug(f"[SkinMonitor] Could not fetch champion {champ_id} data: {e}")
+            return None
+        if not isinstance(champion_data, dict):
+            return None
+        name = champion_data.get("name")
+        return str(name) if name else None
+
+    def _serialize_manage_champion_mods(self, entries) -> list[dict]:
+        mods_payload = []
+        for entry in entries:
+            target_skin_ids = self._get_entry_target_skin_ids(entry)
+            try:
+                relative_path = entry.path.relative_to(self.mod_storage.mods_root)
+            except Exception:  # silent-ok: path outside the mods root is shown as is
+                relative_path = entry.path
+            thumbnail_relative_path = None
+            thumbnail_url = None
+            try:
+                if entry.path.is_dir():
+                    thumbnail_path = _mod_thumbnail(entry.path)
+                    if thumbnail_path is not None:
+                        thumbnail_relative_path = str(
+                            thumbnail_path.relative_to(self.mod_storage.mods_root)
+                        ).replace("\\", "/")
+                        quoted_path = quote(thumbnail_relative_path, safe="/")
+                        thumbnail_url = f"http://127.0.0.1:{self.port}/mod-asset/{quoted_path}"
+            except Exception as e:
+                log.debug(f"[SkinMonitor] No thumbnail for mod {entry.path}: {e}")
+            mods_payload.append(
+                {
+                    "modName": entry.mod_name,
+                    "displayName": entry.display_name,
+                    "skinId": entry.skin_id,
+                    "targetSkinIds": sorted(target_skin_ids),
+                    "description": entry.description,
+                    "updatedAt": int(entry.updated_at * 1000),
+                    "relativePath": str(relative_path).replace("\\", "/"),
+                    "thumbnailRelativePath": thumbnail_relative_path,
+                    "thumbnailUrl": thumbnail_url,
+                }
+            )
+        return mods_payload
+
+    def _handle_request_manage_champion_mods(self, payload: dict) -> None:
+        """List champion mods for the Settings manage UI without touching champ-select state."""
+        if not self.mod_storage:
+            return
+        champion_id = payload.get("championId")
+        if not champion_id:
+            return
+        try:
+            entries = self.mod_storage.list_mods_for_champion(champion_id)
+        except Exception as exc:
+            log.error("[ManageMods] Failed to list champion mods: %s", exc)
+            entries = []
+        self._send_response(json.dumps({
+            "type": "manage-champion-mods-response",
+            "championId": champion_id,
+            "championName": self._lookup_champion_name(champion_id),
+            "mods": self._serialize_manage_champion_mods(entries),
+            "timestamp": int(time.time() * 1000),
+        }))
+
+    def _handle_request_manage_category_mods(self, payload: dict) -> None:
+        """List category mods for the Settings manage UI without historic auto-select."""
+        if not self.mod_storage:
+            return
+        category = payload.get("category")
+        if category not in self.mod_storage.MOD_CATEGORIES:
+            log.warning("[ManageMods] Invalid category: %s", category)
+            return
+        try:
+            mods = self.mod_storage.list_mods_for_category(category)
+        except Exception as exc:
+            log.error("[ManageMods] Failed to list category %s: %s", category, exc)
+            mods = []
+        self._send_response(json.dumps({
+            "type": "manage-category-mods-response",
+            "category": category,
+            "mods": mods,
+            "timestamp": int(time.time() * 1000),
+        }))
 
     def _get_compatible_skin_ids(self, skin_id: int | str) -> set[int]:
         """Return storage skin IDs that can be used for a requested skin.
@@ -1018,6 +1237,7 @@ class MessageHandler:
             result.update(
                 {
                     "modName": selected_mod.mod_name,
+                    "displayName": selected_mod.display_name,
                     "relativePath": str(relative_path).replace(chr(92), "/"),
                     "targetSkinId": payload.get("skinId"),
                     "storageSkinId": selected_mod.skin_id,
@@ -1442,6 +1662,7 @@ class MessageHandler:
                 "target_skin_ids": sorted(self._get_entry_target_skin_ids(selected_mod)),
                 "champion_id": champion_id,
                 "mod_name": selected_mod.mod_name,
+                "display_name": selected_mod.display_name,
                 "mod_path": str(selected_mod.path),
                 "mod_folder_name": mod_folder_name,  # Add this for injection
                 "relative_path": str(selected_mod.path.relative_to(self.mod_storage.mods_root)).replace("\\", "/"),
@@ -1541,6 +1762,309 @@ class MessageHandler:
                 self.shared_state.ui_skin_thread._broadcast_custom_mod_state()
         except Exception as exc:
             log.debug("[Dismiss] Failed to broadcast custom mod state: %s", exc)
+
+    def _clear_active_selection_if_matches(self, champion_id: object, relative_path: object) -> None:
+        """Clear the active/historic custom mod selection if it points at the deleted mod."""
+        if not relative_path:
+            return
+        normalized_target = str(relative_path).replace("\\", "/")
+
+        selected = getattr(self.shared_state, "selected_custom_mod", None)
+        if selected:
+            selected_rel = selected.get("relative_path")
+            if selected_rel and str(selected_rel).replace("\\", "/") == normalized_target:
+                self.shared_state.selected_custom_mod = None
+                try:
+                    if hasattr(self.shared_state, "ui_skin_thread") and self.shared_state.ui_skin_thread:
+                        self.shared_state.ui_skin_thread._broadcast_custom_mod_state()
+                except Exception as exc:
+                    log.debug("[DeleteMod] Failed to broadcast custom mod state: %s", exc)
+
+        try:
+            from utils.core.historic import (
+                clear_historic_entry,
+                get_historic_skin_for_champion,
+                is_custom_mod_path,
+                get_custom_mod_path,
+            )
+            if champion_id:
+                historic_value = get_historic_skin_for_champion(int(champion_id))
+                if historic_value is not None and is_custom_mod_path(historic_value):
+                    historic_path = get_custom_mod_path(historic_value)
+                    if historic_path and historic_path.replace("\\", "/") == normalized_target:
+                        clear_historic_entry(int(champion_id))
+                        log.info("[DeleteMod] Cleared historic entry for champion %s", champion_id)
+        except Exception as exc:
+            log.debug("[DeleteMod] Failed to clear historic entry: %s", exc)
+
+    def _handle_delete_champion_mod(self, payload: dict) -> None:
+        """Permanently delete an imported skin mod from a champion's mod folder."""
+        champion_id = payload.get("championId")
+        mod_name = payload.get("modName")
+        relative_path = payload.get("relativePath")
+        if not self.mod_storage:
+            self._send_response(json.dumps({
+                "type": "champion-mod-deleted",
+                "success": False,
+                "championId": champion_id,
+                "modName": mod_name,
+                "error": "Mod storage is not available",
+            }))
+            return
+        try:
+            deleted = self.mod_storage.delete_champion_mod(
+                champion_id,
+                mod_name=mod_name,
+                relative_path=relative_path,
+            )
+            if deleted:
+                self._clear_active_selection_if_matches(champion_id, relative_path)
+                log.info(
+                    "[DeleteMod] Deleted champion mod: champion=%s, mod=%s",
+                    champion_id,
+                    mod_name,
+                )
+            response_payload = {
+                "type": "champion-mod-deleted",
+                "success": deleted,
+                "championId": champion_id,
+                "modName": mod_name,
+            }
+            if not deleted:
+                response_payload["error"] = "Mod not found"
+            self._send_response(json.dumps(response_payload))
+        except Exception as exc:
+            log.error("[DeleteMod] Failed to delete champion mod: %s", exc)
+            self._send_response(json.dumps({
+                "type": "champion-mod-deleted",
+                "success": False,
+                "championId": champion_id,
+                "modName": mod_name,
+                "error": str(exc),
+            }))
+
+    def _clear_category_selection_if_matches(self, category: object, mod_name: object) -> None:
+        """Clear live selection and mod historic if they point at the deleted category mod."""
+        if not category or not mod_name:
+            return
+        target = f"{category}/{mod_name}".replace("\\", "/")
+
+        def _same_path(value: object) -> bool:
+            return bool(value) and str(value).replace("\\", "/") == target
+
+        single_attr = {
+            "maps": ("selected_map_mod", "map"),
+            "fonts": ("selected_font_mod", "font"),
+            "announcers": ("selected_announcer_mod", "announcer"),
+        }.get(str(category))
+        if single_attr:
+            attr, historic_key = single_attr
+            selected = getattr(self.shared_state, attr, None)
+            if isinstance(selected, dict) and _same_path(selected.get("relative_path")):
+                setattr(self.shared_state, attr, None)
+            try:
+                from utils.core.mod_historic import clear_historic_mod, get_historic_mod
+                historic_value = get_historic_mod(historic_key)
+                if _same_path(historic_value):
+                    clear_historic_mod(historic_key)
+            except Exception as exc:
+                log.debug("[DeleteMod] Failed to clear category historic: %s", exc)
+            return
+
+        selected_others = list(getattr(self.shared_state, "selected_other_mods", None) or [])
+        remaining = [
+            item for item in selected_others
+            if not (isinstance(item, dict) and _same_path(item.get("relative_path")))
+        ]
+        if len(remaining) != len(selected_others):
+            self.shared_state.selected_other_mods = remaining
+        try:
+            from utils.core.mod_historic import (
+                clear_historic_mod,
+                get_historic_mod,
+                write_historic_mod,
+            )
+            historic_value = get_historic_mod(str(category))
+            if isinstance(historic_value, list):
+                kept = [path for path in historic_value if not _same_path(path)]
+                if len(kept) != len(historic_value):
+                    if kept:
+                        write_historic_mod(str(category), kept)
+                    else:
+                        clear_historic_mod(str(category))
+            elif _same_path(historic_value):
+                clear_historic_mod(str(category))
+        except Exception as exc:
+            log.debug("[DeleteMod] Failed to clear category historic: %s", exc)
+
+    def _handle_delete_category_mod(self, payload: dict) -> None:
+        """Permanently delete an imported mod from a category folder."""
+        category = payload.get("category")
+        mod_name = payload.get("modName")
+        if not self.mod_storage:
+            self._send_response(json.dumps({
+                "type": "category-mod-deleted",
+                "success": False,
+                "category": category,
+                "modName": mod_name,
+                "error": "Mod storage is not available",
+            }))
+            return
+        try:
+            deleted = self.mod_storage.delete_category_mod(category, mod_name)
+            if deleted:
+                self._clear_category_selection_if_matches(category, mod_name)
+                log.info(
+                    "[DeleteMod] Deleted category mod: category=%s, mod=%s",
+                    category,
+                    mod_name,
+                )
+            response_payload = {
+                "type": "category-mod-deleted",
+                "success": deleted,
+                "category": category,
+                "modName": mod_name,
+            }
+            if not deleted:
+                response_payload["error"] = "Mod not found"
+            self._send_response(json.dumps(response_payload))
+        except Exception as exc:
+            log.error("[DeleteMod] Failed to delete category mod: %s", exc)
+            self._send_response(json.dumps({
+                "type": "category-mod-deleted",
+                "success": False,
+                "category": category,
+                "modName": mod_name,
+                "error": str(exc),
+            }))
+
+    def _sync_selected_custom_mod_display_name(
+        self,
+        champion_id: object,
+        relative_path: object,
+        mod_name: object,
+        display_name: str,
+    ) -> None:
+        """Keep the live selection/popup in sync after a display-name rename."""
+        selected = getattr(self.shared_state, "selected_custom_mod", None)
+        if not isinstance(selected, dict):
+            return
+
+        selected_rel = str(selected.get("relative_path") or "").replace("\\", "/")
+        target_rel = str(relative_path or "").replace("\\", "/")
+        same_path = bool(target_rel) and selected_rel == target_rel
+        try:
+            same_champion = (
+                champion_id is not None
+                and selected.get("champion_id") is not None
+                and int(selected.get("champion_id")) == int(champion_id)
+            )
+        except (TypeError, ValueError):  # silent-ok: malformed ids never match the selection
+            same_champion = False
+        same_name = bool(mod_name) and selected.get("mod_name") == mod_name
+        if not (same_path or (same_champion and same_name)):
+            return
+
+        selected["display_name"] = display_name
+        try:
+            if hasattr(self.shared_state, "ui_skin_thread") and self.shared_state.ui_skin_thread:
+                self.shared_state.ui_skin_thread._broadcast_custom_mod_state()
+        except Exception as exc:
+            log.debug("[RenameMod] Failed to broadcast custom mod state: %s", exc)
+
+    def _handle_rename_champion_mod(self, payload: dict) -> None:
+        """Set a display alias for an imported skin mod (folder is untouched)."""
+        champion_id = payload.get("championId")
+        mod_name = payload.get("modName")
+        relative_path = payload.get("relativePath")
+        new_name = payload.get("newName")
+        if not self.mod_storage:
+            self._send_response(json.dumps({
+                "type": "champion-mod-renamed",
+                "success": False,
+                "championId": champion_id,
+                "modName": mod_name,
+                "error": "Mod storage is not available",
+            }))
+            return
+        try:
+            display_name = self.mod_storage.set_champion_mod_display_name(
+                champion_id,
+                new_name,
+                mod_name=mod_name,
+                relative_path=relative_path,
+            )
+            self._sync_selected_custom_mod_display_name(
+                champion_id,
+                relative_path,
+                mod_name,
+                display_name,
+            )
+            log.info(
+                "[RenameMod] Renamed champion mod: champion=%s, mod=%s -> %s",
+                champion_id,
+                mod_name,
+                display_name,
+            )
+            self._send_response(json.dumps({
+                "type": "champion-mod-renamed",
+                "success": True,
+                "championId": champion_id,
+                "modName": mod_name,
+                "displayName": display_name,
+            }))
+        except Exception as exc:
+            log.error("[RenameMod] Failed to rename champion mod: %s", exc)
+            self._send_response(json.dumps({
+                "type": "champion-mod-renamed",
+                "success": False,
+                "championId": champion_id,
+                "modName": mod_name,
+                "error": str(exc),
+            }))
+
+    def _handle_rename_category_mod(self, payload: dict) -> None:
+        """Set a display alias for a category mod (folder is untouched)."""
+        category = payload.get("category")
+        mod_name = payload.get("modName")
+        new_name = payload.get("newName")
+        if not self.mod_storage:
+            self._send_response(json.dumps({
+                "type": "category-mod-renamed",
+                "success": False,
+                "category": category,
+                "modName": mod_name,
+                "error": "Mod storage is not available",
+            }))
+            return
+        try:
+            display_name = self.mod_storage.set_category_mod_display_name(
+                category,
+                mod_name,
+                new_name,
+            )
+            log.info(
+                "[RenameMod] Renamed category mod: category=%s, mod=%s -> %s",
+                category,
+                mod_name,
+                display_name,
+            )
+            self._send_response(json.dumps({
+                "type": "category-mod-renamed",
+                "success": True,
+                "category": category,
+                "modName": mod_name,
+                "displayName": display_name,
+            }))
+        except Exception as exc:
+            log.error("[RenameMod] Failed to rename category mod: %s", exc)
+            self._send_response(json.dumps({
+                "type": "category-mod-renamed",
+                "success": False,
+                "category": category,
+                "modName": mod_name,
+                "error": str(exc),
+            }))
 
     def _handle_dismiss_historic(self, payload: dict) -> None:
         """Dismiss historic mode (close-button on popup)"""
@@ -2037,14 +2561,7 @@ class MessageHandler:
             return
 
         category = payload.get("category")
-        if category not in {
-            self.mod_storage.CATEGORY_UI,
-            self.mod_storage.CATEGORY_VOICEOVER,
-            self.mod_storage.CATEGORY_LOADING_SCREEN,
-            self.mod_storage.CATEGORY_VFX,
-            self.mod_storage.CATEGORY_SFX,
-            self.mod_storage.CATEGORY_OTHERS,
-        }:
+        if category not in self.mod_storage.MOD_CATEGORIES:
             log.warning(f"[SkinMonitor] Invalid category for request-category-mods: {category}")
             return
 
@@ -2107,19 +2624,35 @@ class MessageHandler:
         except Exception as e:
             log.error(f"[SkinMonitor] Failed to launch Pengu Loader UI: {e}")
     
+    def _handle_language_save(self, payload: dict) -> None:
+        """Save the language of Rose's menus ("auto": the client's) and tell the plugins"""
+        from utils.core.i18n import AUTO, LANGUAGES
+        language = payload.get("language")
+        if language != AUTO and language not in LANGUAGES:
+            log.warning(f"[SkinMonitor] Unknown menu language: {language!r}")
+            return
+        if (get_config_option("General", "language") or AUTO) != language:
+            set_config_option("General", "language", language)
+            log.info(f"[SkinMonitor] Menu language set to {language}")
+            self.broadcaster.broadcast_language_changed()
+
     def _handle_settings_save(self, payload: dict) -> None:
         """Handle settings save"""
         try:
             threshold = max(0.0, min(2.0, float(payload.get("threshold", 0.5))))
             monitor_auto_resume_timeout = max(1, min(180, int(payload.get("monitorAutoResumeTimeout", 60))))
             autostart = payload.get("autostart", False)
+            hide_empty_categories = bool(payload.get("hideEmptyCategories", False))
             game_path = payload.get("gamePath", "")
-            
+
             set_config_option("General", "injection_threshold", f"{threshold:.2f}")
             log.info(f"[SkinMonitor] Injection threshold updated to {threshold:.2f}s")
             
             set_config_option("General", "monitor_auto_resume_timeout", str(monitor_auto_resume_timeout))
             log.info(f"[SkinMonitor] Monitor auto-resume timeout updated to {monitor_auto_resume_timeout}s")
+
+            set_config_option("General", "hide_empty_categories", "true" if hide_empty_categories else "false")
+            log.info(f"[SkinMonitor] Hide empty mod categories updated to {hide_empty_categories}")
             
             if game_path and game_path.strip():
                 if not self._is_valid_local_league_path(game_path):
@@ -2440,6 +2973,9 @@ class MessageHandler:
             
             # Sort champions by name
             champions = list(champions_dict.values())
+            if payload.get("withModsOnly") and self.mod_storage:
+                # Manage Mods only offers champions that have custom skins
+                champions = [c for c in champions if self.mod_storage.list_mods_for_champion(c["id"])]
             champions.sort(key=lambda x: x["name"])
             
             response_payload = {
@@ -2711,10 +3247,13 @@ class MessageHandler:
                     log.info(f"[PARTY] Party mode enabled, token: {token[:30]}...")
                 except Exception as e:
                     log.error(f"[PARTY] Failed to enable party mode: {e}")
+                    from utils.core.i18n import text_fields
+                    error = e.args[0] if e.args else str(e)
                     response_payload = {
                         "type": "party-enabled",
                         "success": False,
-                        "error": str(e),
+                        "error": str(error),
+                        **text_fields("error", error),
                     }
                     self._send_response(json.dumps(response_payload))
 
@@ -2800,17 +3339,20 @@ class MessageHandler:
 
             async def do_add_peer():
                 try:
-                    success, error = await party_manager.add_peer(token)
+                    success, message = await party_manager.add_peer(token)
+                    from utils.core.i18n import text_fields
                     response_payload = {
                         "type": "party-peer-added",
                         "success": success,
-                        "error": error,
+                        "message": message if success else None,
+                        "error": None if success else message,
+                        **text_fields("message" if success else "error", message),
                     }
                     self._send_response(json.dumps(response_payload))
                     if success:
-                        log.info("[PARTY] Peer added successfully")
+                        log.info(f"[PARTY] Peer added: {message}")
                     else:
-                        log.warning(f"[PARTY] Failed to add peer: {error}")
+                        log.warning(f"[PARTY] Failed to add peer: {message}")
                 except Exception as e:
                     log.error(f"[PARTY] Failed to add peer: {e}")
                     response_payload = {

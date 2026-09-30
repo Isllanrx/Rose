@@ -8,6 +8,12 @@
   const REQUEST_TYPE = "request-skin-mods";
   const BUTTON_ICON_ASSET_PATH = "button-skin.png";
 
+  // Rose's menu language (ROSE-I18n); English until it has loaded
+  const t = (text, vars) =>
+    window.RoseI18n
+      ? window.RoseI18n.t(text, vars)
+      : text.replace(/\{(\w+)\}/g, (m, k) => (vars && k in vars ? String(vars[k]) : m));
+
   let bridge = null;
   let skinMonitorState = null;
   let championLocked = false;
@@ -15,6 +21,8 @@
   let selectedModId = null;
   let selectedModSkinId = null;
   let modsForCurrentSkin = [];
+  // "championId:skinId" the mods list was answered for
+  let modsForKey = null;
   let pythonChromaState = null;
   let currentPhase = null;
   let panel = null;
@@ -146,6 +154,12 @@
     return String(mod?.relativePath || mod?.modName || "");
   }
 
+  function visibleModName(mod, fallback = "") {
+    const alias = typeof mod?.displayName === "string" ? mod.displayName.trim() : "";
+    if (alias) return alias;
+    return mod?.modName || fallback;
+  }
+
   function isModAvailableForSkin(mod, skinId = getCurrentSkinContext().skinId) {
     if (!mod || mod._none) return false;
     const requestedSkinId = Number(skinId);
@@ -224,6 +238,10 @@
   }
 
   function resetCustomSkinSessionState() {
+    // The skin state of the previous champ select must not answer for this one
+    skinMonitorState = null;
+    lastSkinModsRequestKey = null;
+    modsForKey = null;
     pythonChromaState = null;
     selectedModId = null;
     selectedModSkinId = null;
@@ -319,6 +337,8 @@
 }
 .${pnl} .chroma-modal { background: #000; display: flex; flex-direction: column; width: 305px; position: relative; z-index: 0; }
 .${pnl} .chroma-modal.chroma-view { min-height: 355px; max-height: 420px; }
+.${pnl} .champ-select-chroma-modal { background: #000; display: flex; flex-direction: column; width: 305px; position: relative; z-index: 0; }
+.${pnl} .champ-select-chroma-modal.chroma-view { min-height: 0; max-height: 420px; }
 .${pnl} .border {
   position: absolute; top: 0; left: 0; box-sizing: border-box; background-color: transparent;
   box-shadow: 0 0 0 1px rgba(1,10,19,0.48); transition: 250ms all cubic-bezier(0.02,0.85,0.08,0.99);
@@ -329,20 +349,24 @@
 }
 .${pnl} .lc-flyout-content { position: relative; }
 .${pnl} .chroma-information {
-  background-image: url('lol-game-data/assets/content/src/LeagueClient/GameModeAssets/Classic_SRU/img/champ-select-flyout-background.jpg');
-  background-size: cover; border-bottom: thin solid #463714; flex-grow: 1; height: 315px;
-  position: relative; width: 100%; z-index: 1;
+  border-bottom: thin solid #463714; flex-grow: 0;
+  overflow: hidden; position: relative; width: 100%; z-index: 1;
 }
+.${pnl} .chroma-information[data-has-preview="false"] { display: none; }
 .${pnl} .chroma-information-image {
-  bottom: 0; left: 0; position: absolute; right: 0; top: 0;
-  background-size: contain; background-position: center; background-repeat: no-repeat;
+  bottom: 0; display: block; height: auto; left: 0; position: absolute; width: 100%;
 }
 .${pnl} .child-skin-name {
   bottom: 10px; color: #f7f0de;
   font-family: "LoL Display","Times New Roman",Times,Baskerville,Georgia,serif;
   font-size: 24px; font-weight: 700; position: absolute; text-align: center; width: 100%;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 0 4px #000;
 }
+.${pnl} .standalone-skin-name {
+  bottom: auto; box-sizing: border-box; display: none; padding: 10px 12px 8px; position: relative;
+}
+.${pnl} .champ-select-chroma-modal[data-has-preview="false"] > .standalone-skin-name { display: block; }
 .${pnl} .chroma-selection {
   pointer-events: all; height: 100%; overflow: auto; transform: translateZ(0);
   -webkit-mask-box-image-source: url("/fe/lol-static-assets/images/uikit/scrollable/scrollable-content-gradient-mask-bottom.png");
@@ -493,6 +517,12 @@
     }
 
     const requestKey = `${championId}:${skinId}`;
+    if (requestKey !== modsForKey) {
+      // Until Python answers, the list on screen belongs to another skin
+      modsForCurrentSkin = [];
+      modsForKey = null;
+      scanSkinSelection();
+    }
     const now = Date.now();
     if (
       requestKey === lastSkinModsRequestKey &&
@@ -557,12 +587,16 @@
     const chromaInfo = document.createElement("div");
     chromaInfo.className = "chroma-information";
 
-    const preview = document.createElement("div");
+    const preview = document.createElement("img");
     preview.className = "chroma-information-image";
 
     const skinName = document.createElement("div");
     skinName.className = "child-skin-name";
     skinName.textContent = getCurrentSkinContext().skinName;
+
+    const standaloneSkinName = document.createElement("div");
+    standaloneSkinName.className = "child-skin-name standalone-skin-name";
+    standaloneSkinName.textContent = skinName.textContent;
 
     chromaInfo.appendChild(preview);
     chromaInfo.appendChild(skinName);
@@ -571,16 +605,44 @@
     scrollable.className = "chroma-selection";
 
     const list = document.createElement("ul");
+    let previewLoadToken = 0;
 
     const setPreviewImage = (url, label) => {
-      preview.style.display = "block";
-      preview.style.backgroundImage = url ? `url('${url}')` : "";
-      skinName.textContent = label || getCurrentSkinContext().skinName;
+      previewLoadToken += 1;
+      const loadToken = previewLoadToken;
+      const hasPreview = Boolean(url);
+      const nextLabel = label || getCurrentSkinContext().skinName;
+
+      skinName.textContent = nextLabel;
+      standaloneSkinName.textContent = nextLabel;
+
+      if (!hasPreview) {
+        modal.dataset.hasPreview = "false";
+        chromaInfo.dataset.hasPreview = "false";
+        preview.removeAttribute("src");
+        chromaInfo.style.height = "";
+        if (panel && panelButtonRef) requestAnimationFrame(() => positionPanel(panel, panelButtonRef));
+        return;
+      }
+
+      const loader = new Image();
+      loader.addEventListener("load", () => {
+        if (loadToken !== previewLoadToken) return;
+        const width = chromaInfo.clientWidth || 305;
+        if (loader.naturalWidth > 0) {
+          chromaInfo.style.height = `${loader.naturalHeight * (width / loader.naturalWidth)}px`;
+        }
+        preview.src = url;
+        modal.dataset.hasPreview = "true";
+        chromaInfo.dataset.hasPreview = "true";
+        if (panel && panelButtonRef) positionPanel(panel, panelButtonRef);
+      });
+      loader.src = url;
     };
 
     const noneEntry = {
-      id: "__none__", modName: "Base Skin", thumbnailUrl: "",
-      description: "Disable custom skin mod", _none: true,
+      id: "__none__", modName: t("Base Skin"), thumbnailUrl: "",
+      description: t("Disable custom skin mod"), _none: true,
     };
 
     const visibleMods = [noneEntry, ...mods];
@@ -595,7 +657,7 @@
 
       const wheelButton = document.createElement("div");
       wheelButton.className = `chroma-skin-button ${isSelected ? "selected" : ""}`;
-      wheelButton.title = mod.modName || `Custom Skin ${index + 1}`;
+      wheelButton.title = visibleModName(mod, t("Custom Skin {number}", { number: index + 1 }));
 
       const contents = document.createElement("div");
       contents.className = "contents";
@@ -622,13 +684,13 @@
       };
 
       wheelButton.addEventListener("mouseenter", () => {
-        setPreviewImage(thumbnailUrl || "", mod._none ? getCurrentSkinContext().skinName : (mod.modName || getCurrentSkinContext().skinName));
+        setPreviewImage(thumbnailUrl || "", mod._none ? getCurrentSkinContext().skinName : (visibleModName(mod) || getCurrentSkinContext().skinName));
       });
 
       wheelButton.addEventListener("mouseleave", () => {
         const active = visibleMods.find(e => isModSelected(e, getCurrentSkinContext().skinId));
         const au = active && active.thumbnailUrl ? String(active.thumbnailUrl).replace("localhost", "127.0.0.1") : "";
-        const al = active && !active._none ? (active.modName || getCurrentSkinContext().skinName) : getCurrentSkinContext().skinName;
+        const al = active && !active._none ? (visibleModName(active) || getCurrentSkinContext().skinName) : getCurrentSkinContext().skinName;
         setPreviewImage(au, al);
       });
 
@@ -643,12 +705,13 @@
 
     const active = visibleMods.find(e => isModSelected(e, getCurrentSkinContext().skinId));
     const au = active && active.thumbnailUrl ? String(active.thumbnailUrl).replace("localhost", "127.0.0.1") : "";
-    const al = active && !active._none ? (active.modName || getCurrentSkinContext().skinName) : getCurrentSkinContext().skinName;
+    const al = active && !active._none ? (visibleModName(active) || getCurrentSkinContext().skinName) : getCurrentSkinContext().skinName;
     setPreviewImage(au, al);
 
     scrollable.appendChild(list);
     modal.appendChild(border);
     modal.appendChild(chromaInfo);
+    modal.appendChild(standaloneSkinName);
     modal.appendChild(scrollable);
     flyoutContent.appendChild(modal);
     flyout.appendChild(flyoutContent);
@@ -782,6 +845,7 @@
     modsForCurrentSkin = (Array.isArray(detail.mods) ? detail.mods : []).filter((mod) => (
       isModAvailableForSkin(mod, skinId)
     ));
+    modsForKey = `${championId}:${skinId}`;
 
     if (selectedModId && !pendingSelectionRequest) {
       const selectedEntry = modsForCurrentSkin.find((mod) => (

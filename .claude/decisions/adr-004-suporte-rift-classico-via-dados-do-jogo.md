@@ -1,6 +1,6 @@
 # ADR-004 — Rift Clássico: skins geradas a partir dos dados do jogo instalado
 
-- **Status:** aceito (validado in-game em 2026-09-16: Annie Gótica + Tibbers)
+- **Status:** substituído pelo ADR-011 em 2026-09-30 (antes: aceito, validado in-game em 2026-09-16: Annie Gótica + Tibbers)
 - **Data:** 2026-09-16
 
 ## Contexto

@@ -35,7 +35,7 @@ O quarto caso é o que gera `Character record is null` no spawn.
    `C:\Program Files\Rose\_internal\injection\tools\`).
 2. **TOC do WAD do mod**: header WAD v3 = 272 bytes, contagem em `<I` no offset 268, entradas de 32 bytes
    (`<QIIIB` = hash, offset, comprimido, descomprimido, tipo&0x0F; 0=raw, 1/2=gzip, 3=zstd).
-   Reaproveitar `WadReader` de `injection/classic/classic_skin_builder.py`.
+   Reaproveitar `WadReader` de `injection/compat/wad_reader.py`.
 3. **Cruzar** os hashes do mod com o TOC de cada `*.wad.client` do jogo → separar asset novo × override.
 4. **Resolver** os hashes em caminhos via `hashes.game.txt` (só os do mod; a tabela tem 220 MB, não carregar inteira).
 5. **Comparar bin a bin** com `_parse_prop_entries`: versão PROP, **lista de links**, chaves e class hashes.
@@ -70,8 +70,8 @@ sintoma irmão, no spawn, para incompatibilidade de dados de personagem.
 | Sobrevive a patch | sim — o jogo resolve o alvo com os dados novos | não |
 
 Medido: 400 mods amostrados da biblioteca do Rose → 99,5% são redirect e todos declaram o patch corrente.
-`injection/classic/classic_skin_builder.py` já produz exatamente a forma redirect (`retarget_skin_bin`) a partir do
-jogo instalado — é a prova de que a técnica resiliente já existe no projeto.
+O builder do Clássico removido no ADR-011 (`retarget_skin_bin`, ver `git show 4426d4d8:injection/classic/classic_skin_builder.py`)
+produzia exatamente a forma redirect a partir do jogo instalado — é a prova de que a técnica resiliente funciona.
 
 Primeira pergunta de todo diagnóstico: **o mod é redirect ou conteúdo?** Só a segunda família precisa de rebase.
 
@@ -161,9 +161,9 @@ Nesse caso o máximo honesto é **detectar e avisar**, não consertar.
 ## Regras
 
 - Nunca injetar um mod classificado como "esquema quebrado" — recusar e reportar via `report_issue`, seguindo ADR-005.
-- Rebase é caro (ler WADs de GBs): fazer fora do caminho que suspende o jogo, como `prepare_classic_mod` já faz (ADR-004).
+- Rebase é caro (ler WADs de GBs): fazer fora do caminho que suspende o jogo, como o builder do Clássico fazia (ADR-004).
 - Resultado do diagnóstico é cacheável por (hash do `.fantome`, versão do jogo) — invalidar quando o patch mudar.
-- WAD/PROP malformado vira `ClassicSkinError`, nunca exceção não tratada na thread de injeção.
+- WAD/PROP malformado vira `WadFormatError`, nunca exceção não tratada na thread de injeção.
 
 
 ## Prior art — Hematite (RitoShark), Rust, AGPL-3.0 com exceção de dependência

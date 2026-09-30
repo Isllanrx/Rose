@@ -44,7 +44,7 @@ REQUIRED_MODULES = [
     "threads.utilities.loadout_ticker",
     "pengu.communication.message_handler",
     "injection.core.manager",
-    "injection.classic.classic_skin_builder",
+    "injection.classic",
     "injection.compat.wad_index",
     "lcu.core.lcu_api",
     "utils.core.logging",
